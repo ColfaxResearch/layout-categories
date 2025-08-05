@@ -3,9 +3,22 @@ import cutlass.cute as cute
 
 from categories import *
 
-#*************************************************************************
-# CUTE FUNCTIONS
-#*************************************************************************
+def nullify_trivial_strides(flat_layout):
+    """
+    Description: 
+    Given a layout L = (s_1,...,s_m):(d_1,...,d_m),
+    sets d_i = 0 if s_i = 1.
+    """
+    shape  = flat_layout.shape
+    stride = flat_layout.stride
+    new_stride = []
+    for i in range(len(shape)):
+        if shape[i] != 1:
+            new_stride.append(stride[i])
+        else:
+            new_stride.append(0)
+    result = cute.make_layout(shape,stride=tuple(new_stride))
+    return result 
 
 def flatten_layout(layout):
     """
@@ -47,17 +60,11 @@ def is_tractable(layout):
     Description: 
     Checks if a given flat layout L is tractable.
     """
-
-    #Flatten layout
-    flat_layout = flatten_layout(layout)
-
-    #Sort layout
+    flat_layout        = flatten_layout(layout)
     sorted_flat_layout = sort_flat_layout(flat_layout)
-
-    #Check divisibility condition
-    shape = sorted_flat_layout.shape
-    stride = sorted_flat_layout.stride
-    tractable = cute.Boolean(True)
+    shape              = sorted_flat_layout.shape
+    stride             = sorted_flat_layout.stride
+    tractable          = cute.Boolean(True)
     for i in cutlass.range_constexpr(len(shape)-1):
         if tractable and stride[i] != 0:
             if stride[i+1] % (shape[i]*stride[i]) != 0:
@@ -72,27 +79,25 @@ def compute_Tuple_morphism(flat_layout):
     if not is_tractable(flat_layout):
         raise ValueError("The given layout is not tractable.")
     
+    domain  = flat_layout.shape
     sorted_flat_layout, permutation = sort_flat_layout_with_perm(flat_layout)
-
-    shape = sorted_flat_layout.shape
-    stride = sorted_flat_layout.stride
-    domain = shape
-    m = len(domain)
+    shape   = sorted_flat_layout.shape
+    stride  = sorted_flat_layout.stride
+    m = len(shape)
 
     #Find the largest integer k such that stride(L)_k = stride[k-1] = 0
     k=0
     while k<m and stride[k]==0:
         k+=1
 
-    #Construct codomain(alpha)
-    codomain=[]
+    codomain = []
     if k < m:
         codomain.append(stride[k])
         codomain.append(shape[k])
         for j in range(k+2,m+1):
             codomain.append(int(stride[j-1]/(shape[j-2]*stride[j-2])))
             codomain.append(shape[j-1])
-    codomain=tuple(codomain)
+    codomain = tuple(codomain)
 
     #Construct the map alpha'
     alpha_prime = [] 
@@ -107,8 +112,7 @@ def compute_Tuple_morphism(flat_layout):
         inverse_permutation[permutation[i]-1] = i+1
     
     #Construct alpha = alpha' o sigma^{-1}
-    alpha = [alpha_prime[inverse_permutation[i]-1] for i in range(m)]
-    
+    alpha = tuple([alpha_prime[inverse_permutation[i]-1] for i in range(m)])
 
     return Tuple_morphism(domain,codomain,alpha)
 
@@ -118,9 +122,9 @@ def compute_flat_layout(morphism: Tuple_morphism):
     Computes the layout L_f associated to a tuple morphism f.
     """
 
-    domain      = morphism.domain
-    codomain    = morphism.codomain
-    alpha       = morphism.map
+    domain   = morphism.domain
+    codomain = morphism.codomain
+    alpha    = morphism.map
 
     m = len(domain)
     stride_list = [0]*m
@@ -131,10 +135,9 @@ def compute_flat_layout(morphism: Tuple_morphism):
                 t*=codomain[j]
             stride_list[i]=t
 
-    shape_tuple = tuple([int(x) for x in domain])
-    stride_tuple = tuple([int(x) for x in stride_list])
-    
-    layout = cute.make_layout(shape_tuple,stride=stride_tuple)
+    shape_tuple  = tuple(domain)
+    stride_tuple = tuple(stride_list)
+    layout       = cute.make_layout(shape_tuple,stride=stride_tuple)
     return layout
 
 def flat_concatenate(base: cute.Layout, stack: cute.Layout) -> cute.Layout:
@@ -168,9 +171,6 @@ def concatenate(base: cute.Layout, stack: cute.Layout) -> cute.Layout:
         (base.shape, stack.shape),
         stride=(base.stride, stack.stride)
     )
-
-
-
 
 def main():  
     pass

@@ -1,6 +1,5 @@
-import torch 
 import numpy as np
-from tqdm import tqdm
+import pytest
 import cutlass
 import cutlass.cute as cute 
 
@@ -8,69 +7,14 @@ from categories import *
 from test_utils import *
 from layout_utils import *
 
-RANDOM_SEED = 0
-np.random.seed(RANDOM_SEED)
-
-
+iterations = range(50)
 
 #*************************************************************************
-# INTERNAL TESTS
-#*************************************************************************
-
-def internal_sort_test(N: int):
-    """
-    Description: 
-    Randomly generates N tuple morphisms, and checks that for each tuple morphism f, the tuple morphism sort(f) is sorted.
-    """
-    if N < 0: 
-        raise ValueError("N must be a positive integer.")
-
-    failure_count = 0
-    for _ in range(N):
-        f = random_Tuple_morphism()
-        sort_f = f.sort()
-        if not sort_f.is_sorted():
-            failure_count += 1
-    
-    if failure_count == 0:
-        print("sort(f) is sorted.")
-
-    else:
-        print("Sort test failed in",failure_count,"cases.")
-
-def internal_coalesce_test(N: int):
-    """
-    Description: 
-    Randomly generates N tuple morphisms, and checks that for each tuple morphism f, the tuple morphism coalesce(f) is coalesced.
-    """
-    if N < 0: 
-        raise ValueError("N must be a positive integer.")
-
-    failure_count = 0
-    for _ in range(N):
-        f = random_Tuple_morphism()
-        coalesce_f = f.coalesce()
-        if not coalesce_f.is_coalesced():
-            failure_count += 1
-    
-    if failure_count == 0:
-        print("coalesce(f) is coalesced.")
-
-    else:
-        print("Coalesce test failed in",failure_count,"cases.")
-
-
-
-#*************************************************************************
-# EXTERNAL TEST COMPONENTS
+# TEST COMPONENTS
 #*************************************************************************
 
 @cute.jit
-def test_coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]):
-    """
-    Description: 
-    Checks whether or not L_{coalesce(f)} is equal to coalesce(L_f).
-    """
+def coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]):
     coalesce_f = f.coalesce()
     coalesce_f.name = f"coalesce({f.name})"
     layout_f = compute_flat_layout(f)
@@ -78,105 +22,148 @@ def test_coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]):
     layout_coalesce = cute.coalesce(layout_f)
     if cute.rank(coalesce_layout) == 1:
         coalesce_layout = cute.make_layout(coalesce_layout.shape[0], stride=coalesce_layout.stride[0])
-    
-    # print(coalesce_layout)
-    # print(layout_coalesce)
-
     agree = (coalesce_layout == layout_coalesce) or (cute.rank(coalesce_layout) == 0 and layout_coalesce == cute.make_layout(1,stride=0))
     return agree
 
 @cute.jit 
-def test_concat_agree(f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tuple_morphism]):
-    """
-    Description: 
-    Checks whether or not L_{concat(f,g)} is equal to concat(L_f,L_g).
-    """
+def concat_agree(f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tuple_morphism]):
     layout_f = compute_flat_layout(f)
     layout_g = compute_flat_layout(g) 
     concat_morphs = f.concat(g)
     concat_morphs.name = f"concat({f.name}, {g.name})"
     layout_concat = compute_flat_layout(concat_morphs)
     concat_layout = flat_concatenate(layout_f, layout_g)
-    agree = layout_concat == concat_layout
-    return agree
+    return layout_concat == concat_layout
 
 @cute.jit
-def test_compose_agree(f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tuple_morphism]):    
-    """
-    Description: 
-    Checks whether or not L_{g o f} is equal to L_f o L_f.
-    """
+def compose_agree(f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tuple_morphism]):    
     layout_f = compute_flat_layout(f)
     layout_g = compute_flat_layout(g)
     compose_morphs = f.compose(g)
-    layout_compose = compute_flat_layout(compose_morphs)
+    layout_compose = nullify_trivial_strides(compute_flat_layout(compose_morphs))
     compose_layout = cute.composition(layout_g, layout_f)
-    # print(compose_layout)
-    # print(layout_compose)
-    agree = layout_compose == compose_layout
-    return agree
+    return layout_compose == compose_layout
 
+@cute.jit
+def complement_agree(f: cutlass.Constexpr[Tuple_morphism]):
+    f_complement = f.complement()
+    layout_f = compute_flat_layout(f)
+    layout_f_complement = compute_flat_layout(f_complement)
+    complement_layout_f = cute.complement(layout_f,f.cosize())
+    return cute.coalesce(complement_layout_f) == cute.coalesce(layout_f_complement)
 
+@cute.jit
+def flat_divide_agree(f: cutlass.Constexpr[Tuple_morphism],g: cutlass.Constexpr[Tuple_morphism]):
+    layout_f = compute_flat_layout(f)
+    layout_g = compute_flat_layout(g)
+    quotient = g.concat(g.complement()).compose(f)
+    quotient_layout = flatten_layout(cute.logical_divide(layout_f,layout_g))
+    layout_quotient = compute_flat_layout(quotient)
+    return cute.coalesce(layout_quotient) == cute.coalesce(quotient_layout)
+
+@cute.jit
+def flat_product_agree(f:cutlass.Constexpr[Tuple_morphism],g:cutlass.Constexpr[Tuple_morphism]):
+    h = g.compose(f.complement())
+    A = compute_flat_layout(f)
+    B = compute_flat_layout(g)
+    C = compute_flat_layout(f.concat(h))
+    product = flatten_layout(cute.logical_product(A,B))
+    return nullify_trivial_strides(C) == nullify_trivial_strides(product)
 
 #*************************************************************************
-# EXTERNAL TESTS
+# TESTS
 #*************************************************************************
 
-def coalesce_test(N: int):
+@pytest.mark.parametrize("iteration", iterations)
+def test_sort_is_sorted(iteration):
     """
     Description: 
-    Randomly generates N tuple morphisms, and check whether or not L_{coalesce(f)} is equal to coalesce(L_f).
+    If f is a tuple morphism, then sort(f) is sorted.
     """
-    coalesce_agree = True
-    for _ in range(10):
-        f = random_Tuple_morphism()
-        coalesce_agree = coalesce_agree and test_coalesce_agree(f)
-    if coalesce_agree:
-        print("L_{coalesce(f)} = coalesce(L_f)")
-    else:
-        print("Coalesce agreement test failed.")
+    np.random.seed(iteration)
+    f = random_Tuple_morphism()
+    assert f.sort().is_sorted()
 
-def concat_test(N: int):
+@pytest.mark.parametrize("iteration", iterations)
+def test_coalesce_is_coalesced(iteration):
     """
     Description: 
-    Randomly generates N pairs of tuple morphisms with disjoint images, and check whether or not L_{concat(f,g)} is equal to concat(L_f,L_g).
+    If f is a tuple morphism, then coalesce(f) is coalesced.
     """
-    concat_agree = True
-    for _ in range(N):
-        f,g = random_Tuple_morphisms_with_disjoint_images()
-        concat_agree = concat_agree and test_concat_agree(f,g)
-    if concat_agree:
-        print("L_concat(f,g) = concat(L_f,L_g)")
-    else:
-        print("Concatenation agreement test failed!")
+    np.random.seed(iteration)
+    f = random_Tuple_morphism()
+    assert f.coalesce().is_coalesced()
 
-def compose_test(N:int):
+@pytest.mark.parametrize("iteration", iterations)
+def test_complement_is_a_complement(iteration):
     """
     Description: 
-    Randomly generates N pairs of composable tuple morphisms, and check whether or not L_{g o f} is equal to L_g o L_f.
+    If f is a complementable tuple morphism, then complement(f) is a complement of f.
     """
-    compose_agree = True
-    for _ in range(N):
-        f,g = random_Tuple_composable_morphisms()   
-        test_compose_agree(f,g)
-        compose_agree = compose_agree and test_compose_agree(f,g)
-    if compose_agree:
-        print("L_{g o f} = L_g o L_f")
-    else:
-        print("Composition agreement test failed!")
+    np.random.seed(iteration)
+    f = random_Tuple_complementable_morphism()
+    assert f.is_complementary_to(f.complement())
 
+@pytest.mark.parametrize("iteration",iterations)
+def test_coalesce_agree(iteration):
+    """
+    Description: 
+    If f is a tuple morphsm, then L_{coalesce(f)} = coalesce(L_f)
+    if we consider ():() = 1:0, and (s):(d) = s:d
+    """
+    np.random.seed(iteration)
+    f = random_Tuple_morphism()
+    assert coalesce_agree(f)
 
+@pytest.mark.parametrize("iteration",iterations)
+def test_concat_agree(iteration):
+    """
+    Description: 
+    If f and g are tuple morphisms with the same codomain and disjoint images,
+    then L_{concat(f,g)} = concat(L_f,L_g).
+    """
+    f,g = random_Tuple_morphisms_with_disjoint_images()
+    assert concat_agree(f,g)
 
-#*************************************************************************
-# MAIN
-#*************************************************************************
+@pytest.mark.parametrize("iteration",iterations)
+def test_compose_agree(iteration):
+    """
+    Description: 
+    If f and g are composable tuple morphisms, then L_{g o f} = L_g o L_f
+    (after nullifying trivial strides)
+    """
+    f,g = random_Tuple_composable_morphisms()
+    assert compose_agree(f,g)
 
-def main():
-    internal_sort_test(100)
-    internal_coalesce_test(100)
-    coalesce_test(1000)
-    concat_test(100)
-    compose_test(100)
-    
-if __name__ == "__main__":
-    main()
+@pytest.mark.parametrize("iteration",iterations)
+def test_complement_agree(iteration):
+    """
+    Description: 
+    If f is a complementable tuple morphisms, then then 
+    coalesce(L_{complement(f)}) = coalesce(complement(L_f))
+    """
+    np.random.seed(iteration)
+    f = random_Tuple_complementable_morphism()
+    assert complement_agree(f)
+
+@pytest.mark.parametrize("iteration",iterations)
+def test_flat_divide_agree(iteration):
+    """
+    Description: 
+    If g divides f, then 
+    coalesce(L_{f/g}) = coalesce(flatten(L_f oslash L_g))
+    """
+    np.random.seed(iteration)
+    f,g = random_Tuple_divisible_morphisms()
+    assert flat_divide_agree(f,g)
+
+@pytest.mark.parametrize("iteration",iterations)
+def test_flat_product_agree(iteration):
+    """
+    Description: 
+    If f and g are productable tuple morphisms, then 
+    L_{f x g} = flatten(L_f otimes L_g) (after nullifying trivial strides)
+    """
+    np.random.seed(iteration)
+    f,g = random_Tuple_productable_morphisms()
+    assert flat_product_agree(f,g)
