@@ -172,6 +172,37 @@ def concatenate(base: cute.Layout, stack: cute.Layout) -> cute.Layout:
         stride=(base.stride, stack.stride)
     )
 
+def compute_layout(morphism: Nest_morphism) -> cute.Layout:
+    flat_layout = compute_flat_layout(morphism.flatten())
+    shape = morphism.domain.data
+    stride = morphism.domain.sub(flat_layout.stride).data
+    layout = cute.make_layout(shape, stride = stride)
+    return layout
+
+def compute_Nest_morphism(layout):
+    """
+    Description: 
+    Given a tractable layout L, produces a nested tuple morphism f with L_f = L.
+    """
+    if not is_tractable(layout):
+        raise ValueError("The given layout is not tractable.")
+    
+    flat_layout   = flatten_layout(layout)
+    flat_morphism = compute_Tuple_morphism(flat_layout)
+    domain        = NestedTuple(layout.shape)
+    codomain      = NestedTuple(flat_morphism.codomain)
+    map           = flat_morphism.map
+    morphism      = Nest_morphism(domain,codomain,map)
+
+    return morphism
+
+
+
+
+
+
+
+
 def main():  
     pass
     

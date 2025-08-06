@@ -10,7 +10,7 @@ from layout_utils import *
 iterations = range(50)
 
 #*************************************************************************
-# TEST COMPONENTS
+# TUPLE_MORPHISM TEST COMPONENTS
 #*************************************************************************
 
 @cute.jit
@@ -71,7 +71,7 @@ def flat_product_agree(f:cutlass.Constexpr[Tuple_morphism],g:cutlass.Constexpr[T
     return nullify_trivial_strides(C) == nullify_trivial_strides(product)
 
 #*************************************************************************
-# TESTS
+# TUPLE_MORPHISM TESTS
 #*************************************************************************
 
 @pytest.mark.parametrize("iteration", iterations)
@@ -167,3 +167,27 @@ def test_flat_product_agree(iteration):
     np.random.seed(iteration)
     f,g = random_Tuple_productable_morphisms()
     assert flat_product_agree(f,g)
+
+
+#*************************************************************************
+# NEST_MORPHISM TEST COMPONENTS
+#*************************************************************************
+
+
+#*************************************************************************
+# NEST_MORPHISM TESTS
+#*************************************************************************
+
+@pytest.mark.parametrize("iteration", iterations)
+def test_Nest_complement_is_a_complement(iteration):
+    """
+    Description: 
+    If f is a complementable tuple morphism, then complement(f) is a complement of f.
+    """
+    np.random.seed(iteration)
+    f = random_Nest_complementable_morphism()
+    assert f.is_complementary_to(f.complement())
+
+
+
+

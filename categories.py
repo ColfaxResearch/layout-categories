@@ -179,31 +179,90 @@ class NestedTuple:
         self.data = data
 
     def _validate(self, obj):
-        """Recursively validate that the object is an integer or tuple of integers/nested tuples."""
         if isinstance(obj, int):
             return True
         elif isinstance(obj, tuple):
             return all(self._validate(item) for item in obj)
-        else:
-            return False
+        return False
+
+    def _custom_repr(self, obj):
+        if isinstance(obj, int):
+            return str(obj)
+        elif isinstance(obj, tuple):
+            if not obj:
+                return "()"  # empty tuple
+            elif len(obj) == 1:
+                # Single-element tuple → no trailing comma
+                return f"({self._custom_repr(obj[0])})"
+            else:
+                # Multiple elements → comma-separated
+                inner = ",".join(self._custom_repr(item) for item in obj)
+                return f"({inner})"
 
     def __repr__(self):
-        return f"{self.data}"
-
-    def flatten(self):
-        """Flatten the nested tuple into a list of integers."""
-        return list(self._flatten(self.data))
+        return self._custom_repr(self.data)
 
     def _flatten(self, obj):
         if isinstance(obj, int):
             yield obj
-        else:
+        elif isinstance(obj, tuple):
             for item in obj:
                 yield from self._flatten(item)
+    
+    def flatten(self):
+        return tuple(self._flatten(self.data))
 
+    def __len__(self):
+        return len(self.flatten())
+    
     def __iter__(self):
-        """Allow iteration over the flattened data."""
         return iter(self.flatten())
+    
+    def __getitem__(self, index):
+        return self.flatten()[index]
+    
+    def entry(self, i):
+        if i < 1 or i > len(self):
+            raise IndexError("Index out of range")
+        return self[i-1]
+
+    def mode(self, i):
+        if not isinstance(i, int) or i < 1:
+            raise IndexError("Mode index must be a positive integer.")
+        
+        if isinstance(self.data, int):
+            if i == 1:
+                return NestedTuple(self.data)
+            else:
+                raise IndexError("An integer NestedTuple S has only one mode: mode_1(S).")
+        
+        if i > len(self.data):
+            raise IndexError(f"Mode index {i} out of range.")
+        
+        return NestedTuple(self.data[i - 1])
+    
+    def sub(self, values):
+        if len(values) != len(self):
+            raise ValueError("Replacement tuple must have same length as NestedTuple")
+
+        it = iter(values)
+
+        def _replace(obj):
+            if isinstance(obj, int):
+                return next(it)
+            elif isinstance(obj, tuple):
+                return tuple(_replace(item) for item in obj)
+
+        new_data = _replace(self.data)
+        return NestedTuple(new_data)
+    
+    def profile(self):
+        return self.sub(tuple([0]*len(self)))
+    
+    def is_congruent_to(self,other: 'NestedTuple'):
+        return self.profile().data == other.profile().data
+    
+
     
 #*************************************************************************
 # THE CATEGORY Tuple
@@ -582,20 +641,15 @@ class Tuple_morphism:
 
         return Tuple_morphism(tuple(coalesced_domain),tuple(coalesced_codomain),tuple(coalesced_map))
 
-    def is_admissible_for_complementation(self):
-        if 0 in set(self.map):
-            return False
-        else:
-            return True 
         
     def is_complementable(self):
         """
-        Checks if morphism is admissible for complementation.
+        Checks if morphism is complementable.
 
-        :return: True if morphism is admissible for complementation, False otherwise.
+        :return: True if morphism is complementable, False otherwise.
         :rtype: bool
         """
-        if 0 in set(self.domain):
+        if 0 in set(self.map):
             return False
         else:
             return True
@@ -668,7 +722,7 @@ class Nest_morphism:
     :return: Nest_morphism
     :rtype: Nest_morphism
     """
-    def __init__(self, domain: NestedTuple, codomain: NestedTuple, map: list, name: str = ''):
+    def __init__(self, domain: NestedTuple, codomain: NestedTuple, map: tuple, name: str = ''):
         self.domain         = domain
         self.codomain       = codomain
         self.map            = map
@@ -710,6 +764,11 @@ class Nest_morphism:
         out += '=' * max_length + '\n'
         return out
     
+    def flatten(self):
+        domain = self.domain.flatten()
+        codomain = self.codomain.flatten()
+        return Tuple_morphism(domain,codomain,self.map)
+
     def size(self):
         size = 1
         for entry in self.domain.flatten():
@@ -722,24 +781,14 @@ class Nest_morphism:
             cosize*=entry
         return cosize
 
-    # def is_sorted(self):
-    #     """
-    #     Checks if the given morphism in C is sorted.
+    def is_sorted(self):
+        """
+        Checks if the given nested tuple morphism is sorted.
         
-    #     :return: True if the given morphism is sorted, False otherwise.
-    #     :rtype: bool
-    #     """
-    #     m = len(self.domain)
-    #     n = len(self.codomain)
-    #     map_ = self.map
-    #     for i, value in enumerate(map_):
-    #         if (value == 0) and (i>0) and ((map_[i-1]!=0) or ((map_[i-1]==0) and self.domain[i-1]>self.domain[i])):
-    #             return False
-    #         if (i<m-1) and (value != 0) and (map_[i+1]!=0) and (value > map_[i+1]):
-    #             for j in range(map_[i+1]-1,value):
-    #                 if self.codomain[j]!=1:
-    #                     return False  
-    #     return True
+        :return: True if the given morphism is sorted, False otherwise.
+        :rtype: bool
+        """
+        return self.flatten().is_sorted()
     
     # def is_coalesced(self):
     #     """
@@ -897,37 +946,37 @@ class Nest_morphism:
     #     sorted_morphism = g.compose(self)
     #     return sorted_morphism
 
-    # def images_are_disjoint(self, g):
-    #     """
-    #     Checks if morphisms f and g in C with the same codomain have disjoint images.
+    def images_are_disjoint(self, g):
+        """
+        Checks if morphisms f and g in C with the same codomain have disjoint images.
         
-    #     :param g: second morphism in comparison
-    #     :type g: Tuple_morphism
+        :param g: second morphism in comparison
+        :type g: Tuple_morphism
         
-    #     :return: True if the given morphisms have disjoint images, False otherwise.
-    #     :rtype: bool
-    #     """
-    #     return self.underlying_map.images_are_disjoint(g.underlying_map)
+        :return: True if the given morphisms have disjoint images, False otherwise.
+        :rtype: bool
+        """
+        if self.codomain.data != g.codomain.data:
+            raise ValueError("Morphisms do not have the same codomain.")
+        return self.flatten().images_are_disjoint(g.flatten())
 
-    # def concat(self, g):    
-    #     """
-    #     Computes the concatenation concat(f,g) of morphisms f and g in C
-    #     with the same codomain and disjoint images.
+    def concat(self, g):    
+        """
+        Computes the concatenation (f,g) of nested tuple morphisms f and g
+        with the same codomain and disjoint images.
         
-    #     :param g: second morphism in concatenation
-    #     :type g: Tuple_morphism
+        :param g: second morphism in concatenation
+        :type g: Nest_morphism
         
-    #     :return: concatenation of f and g
-    #     :rtype: Tuple_morphism
-    #     """
-    #     if not self.images_are_disjoint(g):
-    #         raise ValueError("The given morphisms do not have the same codomain and disjoint images.")
-        
-    #     wedge_result = self.underlying_map.wedge(g.underlying_map)
-    #     if wedge_result is None:
-    #         raise ValueError("The given morphisms do not have disjoint images.")
-    #     concat = Tuple_morphism(self.domain+g.domain,self.codomain,wedge_result.map)
-    #     return concat
+        :return: concatenation of f and g
+        :rtype: Nest_morphism
+        """
+        if not self.images_are_disjoint(g):
+            raise ValueError("The given morphisms do not have the same codomain and disjoint images.")
+        concat = Nest_morphism(NestedTuple((self.domain.data,g.domain.data)),
+                                self.codomain,
+                                self.underlying_map.wedge(g.underlying_map).map)
+        return concat
 
     # def squeeze(self):
     #     """
@@ -1035,67 +1084,63 @@ class Nest_morphism:
     #         else:
     #             return True 
         
-    # def is_complementable(self):
-    #     """
-    #     Checks if morphism is admissible for complementation.
+    def is_complementable(self):
+        """
+        Checks if nested tuple morphism is complementable.
 
-    #     :return: True if morphism is admissible for complementation, False otherwise.
-    #     :rtype: bool
-    #     """
-    #     if 0 in set(self.domain):
-    #         return False
-    #     else:
-    #         return True
+        :return: True if morphism is complementable, False otherwise.
+        :rtype: bool
+        """
+        if 0 in set(self.map):
+            return False
+        else:
+            return True
     
-    # def complement(self):
-    #     """
-    #     Computes the complement of f.
+    def complement(self):
+        """
+        Computes the complement of f.
 
-    #     :return: Complement of given morphism in C.
-    #     :rtype: Tuple_morphism
-    #     """
+        :return: Complement of nested tuple morphism.
+        :rtype: Nest_morphism
+        """
 
-    #     if not self.is_complementable():
-    #         raise ValueError("The given morphism is not admissible for complementation.")
+        if not self.is_complementable():
+            raise ValueError("The given morphism is not complementable.")
         
-    #     codomain = self.codomain
-    #     image_indices = set(self.map)
-    #     domain = [codomain[i] for i in range(len(codomain)) if i+1 not in image_indices]
-    #     map = [i+1 for i in range(len(codomain)) if i+1 not in image_indices]
-    #     return Tuple_morphism(domain,codomain,map)
+        codomain = self.codomain
+        image_indices = set(self.map)
+        domain = [codomain[i] for i in range(len(codomain)) if i+1 not in image_indices]
+        domain = NestedTuple(tuple(domain))
+        map = tuple([i+1 for i in range(len(codomain)) if i+1 not in image_indices])
+        return Nest_morphism(domain,codomain,map)
     
-    # def is_isomorphism(self):
-    #     """
-    #     Checks if f is an isomorphism.
+    def is_isomorphism(self):
+        """
+        Checks if f is an isomorphism.
         
-    #     :return: True if the given morphisms is an isomorphism, False otherwise.
-    #     :rtype: bool
-    #     """
-    #     m = len(self.domain)
-    #     n = len(self.codomain)
-    #     if (m == n) and set(self.map) == set(range(1,m+1)):
-    #         return True
-    #     else:
-    #         return False
+        :return: True if the given nested tuple morphism is an isomorphism, False otherwise.
+        :rtype: bool
+        """
+        return self.flatten().is_isomorphism()
             
-    # def is_complementary_to(self,other):
-    #     """
-    #     Checks if morphism is complementary to other morphism.
+    def is_complementary_to(self,other):
+        """
+        Checks if morphism is complementary to other morphism.
         
-    #     :param g: other morphism
-    #     :type g: Tuple_morphism 
+        :param g: other morphism
+        :type g: Nest_morphism 
         
-    #     :return: True if morphism is complementary to other morphism, False otherwise.
-    #     :rtype: bool
-    #     """
-    #     if self.codomain != other.codomain:
-    #         raise ValueError("The given morphisms do not have the same codomain.")
+        :return: True if morphism is complementary to other morphism, False otherwise.
+        :rtype: bool
+        """
+        if self.codomain.data != other.codomain.data:
+            raise ValueError("The given morphisms do not have the same codomain.")
         
-    #     concat = self.concat(other)
+        concat = self.concat(other)
 
-    #     if concat.is_isomorphism():
-    #         return True
-    #     else:
-    #         return False
+        if concat.is_isomorphism():
+            return True
+        else:
+            return False
 
 
