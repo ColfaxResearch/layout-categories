@@ -212,17 +212,28 @@ class NestedTuple:
     def flatten(self):
         return tuple(self._flatten(self.data))
 
-    def __len__(self):
-        return len(self.flatten())
-    
     def __iter__(self):
         return iter(self.flatten())
     
     def __getitem__(self, index):
         return self.flatten()[index]
     
+    def length(self):
+        return len(self.flatten())
+    
+    def rank(self):
+        if isinstance(self.data,int):
+            return 1
+        return len(self.data)
+    
+    def size(self):
+        size = 1
+        for entry in self.flatten():
+            size*=entry
+        return size
+
     def entry(self, i):
-        if i < 1 or i > len(self):
+        if i < 1 or i > self.length():
             raise IndexError("Index out of range")
         return self[i-1]
 
@@ -236,13 +247,13 @@ class NestedTuple:
             else:
                 raise IndexError("An integer NestedTuple S has only one mode: mode_1(S).")
         
-        if i > len(self.data):
+        if i > self.length():
             raise IndexError(f"Mode index {i} out of range.")
         
         return NestedTuple(self.data[i - 1])
     
     def sub(self, values):
-        if len(values) != len(self):
+        if len(values) != self.length():
             raise ValueError("Replacement tuple must have same length as NestedTuple")
 
         it = iter(values)
@@ -257,7 +268,7 @@ class NestedTuple:
         return NestedTuple(new_data)
     
     def profile(self):
-        return self.sub(tuple([0]*len(self)))
+        return self.sub(tuple([0]*self.length()))
     
     def is_congruent_to(self,other: 'NestedTuple'):
         return self.profile().data == other.profile().data
@@ -1109,9 +1120,9 @@ class Nest_morphism:
         
         codomain = self.codomain
         image_indices = set(self.map)
-        domain = [codomain[i] for i in range(len(codomain)) if i+1 not in image_indices]
+        domain = [codomain[i] for i in range(codomain.length()) if i+1 not in image_indices]
         domain = NestedTuple(tuple(domain))
-        map = tuple([i+1 for i in range(len(codomain)) if i+1 not in image_indices])
+        map = tuple([i+1 for i in range(codomain.length()) if i+1 not in image_indices])
         return Nest_morphism(domain,codomain,map)
     
     def is_isomorphism(self):

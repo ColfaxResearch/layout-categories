@@ -15,9 +15,8 @@ iterations = range(50)
 
 @cute.jit
 def coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]):
-    coalesce_f = f.coalesce()
-    coalesce_f.name = f"coalesce({f.name})"
-    layout_f = compute_flat_layout(f)
+    coalesce_f      = f.coalesce()
+    layout_f        = compute_flat_layout(f)
     coalesce_layout = compute_flat_layout(coalesce_f)
     layout_coalesce = cute.coalesce(layout_f)
     if cute.rank(coalesce_layout) == 1:
@@ -27,18 +26,17 @@ def coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]):
 
 @cute.jit 
 def concat_agree(f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tuple_morphism]):
-    layout_f = compute_flat_layout(f)
-    layout_g = compute_flat_layout(g) 
+    layout_f      = compute_flat_layout(f)
+    layout_g      = compute_flat_layout(g) 
     concat_morphs = f.concat(g)
-    concat_morphs.name = f"concat({f.name}, {g.name})"
     layout_concat = compute_flat_layout(concat_morphs)
     concat_layout = flat_concatenate(layout_f, layout_g)
     return layout_concat == concat_layout
 
 @cute.jit
 def compose_agree(f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tuple_morphism]):    
-    layout_f = compute_flat_layout(f)
-    layout_g = compute_flat_layout(g)
+    layout_f       = compute_flat_layout(f)
+    layout_g       = compute_flat_layout(g)
     compose_morphs = f.compose(g)
     layout_compose = nullify_trivial_strides(compute_flat_layout(compose_morphs))
     compose_layout = cute.composition(layout_g, layout_f)
@@ -46,17 +44,19 @@ def compose_agree(f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tup
 
 @cute.jit
 def complement_agree(f: cutlass.Constexpr[Tuple_morphism]):
-    f_complement = f.complement()
-    layout_f = compute_flat_layout(f)
+    f_complement        = f.complement()
+    layout_f            = compute_flat_layout(f)
     layout_f_complement = compute_flat_layout(f_complement)
     complement_layout_f = cute.complement(layout_f,f.cosize())
     return cute.coalesce(complement_layout_f) == cute.coalesce(layout_f_complement)
 
 @cute.jit
 def flat_divide_agree(f: cutlass.Constexpr[Tuple_morphism],g: cutlass.Constexpr[Tuple_morphism]):
-    layout_f = compute_flat_layout(f)
-    layout_g = compute_flat_layout(g)
-    quotient = g.concat(g.complement()).compose(f)
+    layout_f        = compute_flat_layout(f)
+    layout_g        = compute_flat_layout(g)
+    quotient        = g.concat(g.complement()).compose(f)
+    # if cute.rank(layout_g) == 0:
+    #     layout_g = cute.make_layout(1,stride = 0)
     quotient_layout = flatten_layout(cute.logical_divide(layout_f,layout_g))
     layout_quotient = compute_flat_layout(quotient)
     return cute.coalesce(layout_quotient) == cute.coalesce(quotient_layout)
@@ -173,6 +173,23 @@ def test_flat_product_agree(iteration):
 # NEST_MORPHISM TEST COMPONENTS
 #*************************************************************************
 
+@cute.jit 
+def Nest_concat_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]):
+    layout_f      = compute_layout(f)
+    layout_g      = compute_layout(g) 
+    concat_morphs = f.concat(g)
+    layout_concat = compute_layout(concat_morphs)
+    concat_layout = concatenate(layout_f, layout_g)
+    return layout_concat == concat_layout
+
+@cute.jit
+def Nest_compose_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]):    
+    layout_f       = compute_layout(f)
+    layout_g       = compute_layout(g)
+    compose_morphs = f.compose(g)
+    layout_compose = nullify_trivial_strides(compute_flat_layout(compose_morphs))
+    compose_layout = cute.composition(layout_g, layout_f)
+    return layout_compose == compose_layout
 
 #*************************************************************************
 # NEST_MORPHISM TESTS
@@ -188,6 +205,11 @@ def test_Nest_complement_is_a_complement(iteration):
     f = random_Nest_complementable_morphism()
     assert f.is_complementary_to(f.complement())
 
+@pytest.mark.parametrize("iteration", iterations)
+def test_Nest_concat_agree(iteration):
+    np.random.seed(iteration)
+    f,g = random_Nest_morphisms_with_disjoint_images()
+    assert Nest_concat_agree(f,g)
 
 
 

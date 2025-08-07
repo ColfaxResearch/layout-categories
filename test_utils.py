@@ -28,7 +28,7 @@ def random_ordered_subtuple(m: int, k: int) -> tuple:
     sampled = random.sample(range(1, m+1), k)
     return tuple(sampled)
 
-def random_Fin_morphism(min_length = 1, max_length = 9):
+def random_Fin_morphism(min_length = 0, max_length = 9):
     """
     Description:
     Randomly generate a morphism in Fin_*
@@ -51,7 +51,7 @@ def random_Fin_morphism(min_length = 1, max_length = 9):
 
     return Fin_morphism(domain, codomain, map_)
     
-def random_Tuple_morphism(min_length = 1, max_length = 9, max_value = 10):
+def random_Tuple_morphism(min_length = 0, max_length = 9, max_value = 10):
     """
     Description:
     Randomly generates a tuple morphism f.
@@ -88,7 +88,7 @@ def random_Tuple_morphism(min_length = 1, max_length = 9, max_value = 10):
 
     return Tuple_morphism(domain,codomain, map_)
 
-def random_Tuple_composable_morphisms(min_length = 1, max_length = 9, max_value = 10):
+def random_Tuple_composable_morphisms(min_length = 0, max_length = 9, max_value = 10):
     """
     Description:
     Randomly generate a pair of composable tuple morphisms f and g.
@@ -126,7 +126,7 @@ def random_Tuple_composable_morphisms(min_length = 1, max_length = 9, max_value 
 
     return f, g 
 
-def random_Tuple_morphisms_with_disjoint_images(min_length = 1, max_length = 9, max_value = 10):
+def random_Tuple_morphisms_with_disjoint_images(min_length = 0, max_length = 9, max_value = 10):
     """
     Description:
     Randomly generates a pair of tuple morphisms f, g with the same codomain and disjoint images.
@@ -175,9 +175,10 @@ def random_Tuple_complementable_morphism(min_length = 2, max_length = 9, max_val
     with length(codomain)>1 and 0<length(domain)<length(codomain). Still need
     to cover the case that length(domain) in {0,length(codomain)}.
     """
+    codomain_length = np.random.randint(min_length,max_length+1)
     codomain = []
-    for _ in range(np.random.randint(min_length,max_length)):
-        codomain.append(np.random.randint(1,max_value))
+    for _ in range(codomain_length):
+        codomain.append(np.random.randint(1,max_value+1))
     codomain = tuple(codomain)
 
     size_of_image = np.random.randint(1,len(codomain))
@@ -190,7 +191,7 @@ def random_Tuple_complementable_morphism(min_length = 2, max_length = 9, max_val
     
     return Tuple_morphism(domain,codomain,map_)
 
-def random_Tuple_divisible_morphisms(min_length = 1, max_length = 9, max_value = 10):
+def random_Tuple_divisible_morphisms(min_length = 2, max_length = 9, max_value = 10):
     """
     Description:
     Randomly generates a pair of tuple morphisms f, g such that
@@ -239,39 +240,30 @@ def random_Tuple_productable_morphisms(min_length = 2, max_length = 9, max_value
 
     return f, g
 
-
-
-
-def random_NestedTuple(length,max_depth=3,max_width=3,int_range=(1, 10)):
+def random_NestedTuple(length=5, max_depth=4, max_width=5, int_range=(1, 10)):
     """
     Generate a NestedTuple containing exactly `length` integers.
-
-    Parameters:
-    - length (int): Number of integer entries in the NestedTuple.
-    - max_depth (int): Maximum allowed nesting depth.
-    - max_width (int): Maximum tuple width per nesting level.
-    - int_range (tuple): Range of integer values (min, max).
-
-    Returns:
-    - NestedTuple instance.
     """
-
     def generate(depth, remaining):
+        if remaining <= 0:
+            return ()
+
         if depth >= max_depth:
-            # At max depth, just return a flat tuple of remaining integers
             return tuple(random.randint(*int_range) for _ in range(remaining))
         
         if remaining == 1:
-            # Only one integer left to place → return it
             return random.randint(*int_range)
 
-        # Choose how many sub-branches to divide into
-        width = random.randint(1, min(max_width, remaining))
+        valid_width = min(max_width, remaining)
+        if valid_width < 1:
+            return ()
+
+        width = random.randint(1, valid_width)
 
         if width == 1:
             counts = [remaining]
         else:
-            cuts = sorted(random.sample(range(1, remaining), width - 1))
+            cuts   = sorted(random.sample(range(1, remaining), width - 1))
             counts = [cuts[0]] + [cuts[i] - cuts[i-1] for i in range(1, len(cuts))] + [remaining - cuts[-1]]
 
         return tuple(generate(depth + 1, count) for count in counts)
