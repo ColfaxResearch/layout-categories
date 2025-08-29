@@ -7,7 +7,7 @@ from categories import *
 from test_utils import *
 from layout_utils import *
 
-iterations = range(50)
+iterations = range(1000)
 
 #*************************************************************************
 # TUPLE_MORPHISM TEST COMPONENTS
@@ -19,9 +19,7 @@ def coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]):
     layout_f        = compute_flat_layout(f)
     coalesce_layout = compute_flat_layout(coalesce_f)
     layout_coalesce = cute.coalesce(layout_f)
-    if cute.rank(coalesce_layout) == 1:
-        coalesce_layout = cute.make_layout(coalesce_layout.shape[0], stride=coalesce_layout.stride[0])
-    agree = (coalesce_layout == layout_coalesce) or (cute.rank(coalesce_layout) == 0 and layout_coalesce == cute.make_layout(1,stride=0))
+    agree = (coalesce_layout == layout_coalesce) or (cute.rank(coalesce_layout) == 0 and layout_coalesce == cute.make_layout(1,stride=0)) or (cute.rank(coalesce_layout) == 1 and layout_coalesce == cute.make_layout(coalesce_layout.shape[0], stride=coalesce_layout.stride[0]))
     return agree
 
 @cute.jit 
@@ -54,7 +52,7 @@ def complement_agree(f: cutlass.Constexpr[Tuple_morphism]):
 def flat_divide_agree(f: cutlass.Constexpr[Tuple_morphism],g: cutlass.Constexpr[Tuple_morphism]):
     layout_f        = compute_flat_layout(f)
     layout_g        = compute_flat_layout(g)
-    quotient        = g.concat(g.complement()).compose(f)
+    quotient        = f.flat_divide(g)
     # if cute.rank(layout_g) == 0:
     #     layout_g = cute.make_layout(1,stride = 0)
     quotient_layout = flatten_layout(cute.logical_divide(layout_f,layout_g))
@@ -63,10 +61,10 @@ def flat_divide_agree(f: cutlass.Constexpr[Tuple_morphism],g: cutlass.Constexpr[
 
 @cute.jit
 def flat_product_agree(f:cutlass.Constexpr[Tuple_morphism],g:cutlass.Constexpr[Tuple_morphism]):
-    h = g.compose(f.complement())
+    k = f.flat_product(g)
     A = compute_flat_layout(f)
     B = compute_flat_layout(g)
-    C = compute_flat_layout(f.concat(h))
+    C = compute_flat_layout(k)
     product = flatten_layout(cute.logical_product(A,B))
     return nullify_trivial_strides(C) == nullify_trivial_strides(product)
 
@@ -191,6 +189,7 @@ def Nest_compose_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr
     compose_layout = cute.composition(layout_g, layout_f)
     return layout_compose == compose_layout
 
+
 #*************************************************************************
 # NEST_MORPHISM TESTS
 #*************************************************************************
@@ -210,6 +209,5 @@ def test_Nest_concat_agree(iteration):
     np.random.seed(iteration)
     f,g = random_Nest_morphisms_with_disjoint_images()
     assert Nest_concat_agree(f,g)
-
 
 

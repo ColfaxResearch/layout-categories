@@ -269,58 +269,66 @@ def random_NestedTuple(length=5, max_depth=4, max_width=5, int_range=(1, 10)):
         return tuple(generate(depth + 1, count) for count in counts)
 
     return NestedTuple(generate(0, length))
-    
+
+def random_profile(length = 5, max_depth = 4, max_width = 5):
+    return random_NestedTuple(length = length, max_depth = max_depth, max_width = max_width, int_range = (0,0))
+
 def random_Nest_morphism():
     flat_morphism = random_Tuple_morphism()
-    flat_domain = flat_morphism.domain
+    flat_domain   = flat_morphism.domain
     flat_codomain = flat_morphism.codomain
-
-    domain = random_NestedTuple(length = len(flat_domain))
-    domain = domain.sub(flat_domain)
-
-    codomain = random_NestedTuple(length = len(flat_codomain))
-    codomain = codomain.sub(flat_codomain)
-
+    domain        = random_profile(length = len(flat_domain)).sub(flat_domain)
+    codomain      = random_profile(length = len(flat_codomain)).sub(flat_codomain)
     return Nest_morphism(domain,codomain,flat_morphism.map)
 
 def random_Nest_composable_morphisms():
     flat_f, flat_g = random_Tuple_composable_morphisms()
-
-    domain_f   = random_NestedTuple(length = len(flat_f.domain)).sub(flat_f.domain)
-    codomain_f = random_NestedTuple(length = len(flat_f.codomain)).sub(flat_f.codomain)
+    domain_f   = random_profile(length = len(flat_f.domain)).sub(flat_f.domain)
+    codomain_f = random_profile(length = len(flat_f.codomain)).sub(flat_f.codomain)
     domain_g   = codomain_f
-    codomain_g = random_NestedTuple(length = len(flat_g.codomain)).sub(flat_g.codomain)
-
+    codomain_g = random_profile(length = len(flat_g.codomain)).sub(flat_g.codomain)
     f = Nest_morphism(domain_f,codomain_f,flat_f.map)
     g = Nest_morphism(domain_g,codomain_g,flat_g.map)
-
     return f, g
 
 def random_Nest_morphisms_with_disjoint_images():
     flat_f, flat_g = random_Tuple_morphisms_with_disjoint_images()
-
-    domain_f   = random_NestedTuple(length = len(flat_f.domain)).sub(flat_f.domain)
-    codomain_f = random_NestedTuple(length = len(flat_f.codomain)).sub(flat_f.codomain)
-    domain_g   = random_NestedTuple(length = len(flat_g.domain)).sub(flat_g.domain)
+    domain_f   = random_profile(length = len(flat_f.domain)).sub(flat_f.domain)
+    codomain_f = random_profile(length = len(flat_f.codomain)).sub(flat_f.codomain)
+    domain_g   = random_profile(length = len(flat_g.domain)).sub(flat_g.domain)
     codomain_g = codomain_f
-
     f = Nest_morphism(domain_f,codomain_f,flat_f.map)
     g = Nest_morphism(domain_g,codomain_g,flat_g.map)
-
     return f,g
 
 def random_Nest_complementable_morphism():
     flat_f = random_Tuple_complementable_morphism()
-
     domain_f   = random_NestedTuple(length = len(flat_f.domain)).sub(flat_f.domain)
     codomain_f = random_NestedTuple(length = len(flat_f.codomain)).sub(flat_f.codomain)
     map_f      = flat_f.map
-
     f = Nest_morphism(domain_f,codomain_f,map_f)
     return f
 
+def random_Nest_divisible_morphisms(min_length = 2, max_length = 9, max_value = 10):
+    flat_f, flat_g = random_Tuple_divisible_morphisms(min_length = min_length, max_length = max_length, max_value = max_value)
+    domain_f    = random_profile(length = len(flat_f.domain)).sub(flat_f.domain)
+    codomain_f  = random_profile(length = len(flat_f.codomain)).sub(flat_f.codomain)
+    map_f       = flat_f.map
+    domain_g    = random_profile(length = len(flat_g.domain)).sub(flat_g.domain)
+    codomain_g  = NestedTuple(domain_f.data)
+    map_g       = flat_g.map
+    f = Nest_morphism(domain_f,codomain_f,map_f)
+    g = Nest_morphism(domain_g,codomain_g,map_g)
+    return f,g
 
-
-
-
-
+def random_Nest_productable_morphisms(min_length = 2, max_length = 9, max_value = 10):
+    flat_f,flat_g = random_Tuple_productable_morphisms(min_length = min_length, max_length = max_length, max_value = max_value)
+    domain_f    = random_profile(length = len(flat_f.domain)).sub(flat_f.domain)
+    codomain_f  = random_profile(length = len(flat_f.codomain)).sub(flat_f.codomain)
+    map_f       = flat_f.map
+    domain_g    = random_profile(length = len(flat_g.domain)).sub(flat_g.domain)
+    codomain_g  = random_profile(length = len(flat_g.codomain)).sub(flat_g.codomain)
+    map_g       = flat_g.map
+    f = Nest_morphism(domain_f,codomain_f,map_f)
+    g = Nest_morphism(domain_g,codomain_g,map_g)
+    return f,g

@@ -1,14 +1,16 @@
+from unittest import result
 import cutlass
 import cutlass.cute as cute
 
 from categories import *
 
-def nullify_trivial_strides(flat_layout):
+def nullify_trivial_strides(flat_layout: cute.Layout) -> cute.Layout:
     """
     Description: 
-    Given a layout L = (s_1,...,s_m):(d_1,...,d_m),
+    Given a flat layout L = (s_1,...,s_m):(d_1,...,d_m),
     sets d_i = 0 if s_i = 1.
     """
+    cute.is_int_tuple
     shape  = flat_layout.shape
     stride = flat_layout.stride
     new_stride = []
@@ -71,6 +73,7 @@ def is_tractable(layout):
                 tractable = False
     return tractable
 
+@cute.jit
 def compute_Tuple_morphism(flat_layout):
     """
     Description: 
@@ -179,6 +182,7 @@ def compute_layout(morphism: Nest_morphism) -> cute.Layout:
     layout = cute.make_layout(shape, stride = stride)
     return layout
 
+@cute.jit
 def compute_Nest_morphism(layout):
     """
     Description: 
@@ -196,11 +200,145 @@ def compute_Nest_morphism(layout):
 
     return morphism
 
+def flat_complement(flat_layout, N):
+    reduced_layout = sort_flat_layout(flat_layout)
+    S = reduced_layout.shape
+    D = reduced_layout.stride
+    m = len(S)
+    shape = [D[0]]
+    for i in range(1, m):
+        shape.append(D[i] // (S[i-1] * D[i-1]))
+    shape.append(N // (S[-1] * D[-1]))
+    stride = [1]
+    for i in range(m):
+        stride.append(S[i] * D[i])
+    return cute.make_layout(tuple(shape), stride=tuple(stride))
 
+def depth2_refinement(refinement,input):
+    """"
+    Currently assumes that there exists a nesting on refinement whose depth
+    1 reduction is input
+    """
+    breaks = [0]
+    current_product = 1
+    j = 0
+    for i in range(len(refinement)):
+        current_product *= refinement[i]
+        if current_product == input[j]:
+            breaks.append(i+1)
+            j+=1
+            current_product = 1
+    tuples = []
+    for i in range(len(breaks)-1):
+        tuples.append(tuple(refinement[breaks[i]: breaks[i+1]]))
+    for i, entry in enumerate(tuples):
+        if len(entry) == 1:
+            tuples[i] = entry[0]
+    tuples = tuple(tuples)
+    return tuples
 
+def mutual_refinement(tuple1,tuple2):
+    """
+    Given tuples tuple1 = T and tuple2 = U, computes nested tuples 
+    T' and U' whose depth one reductions are T and U, and whose flattenings
+    are equal. For example 
+    T = (6,6)
+    U = (2,6,3)
+    ->
+    T' = ((2,3),(2,3))
+    U' = (2,(3,2),3)
+    flat(T') = flat(U') = (2,3,2,3)
+    """
+    list1 = list(tuple1)
+    list2 = list(tuple2)
 
+    i = 0
+    j = 0
+    result = []
+    while i < len(list1) and j < len(list2):
+        if list1[i] == list2[j]:
+            result.append(list1[i])
+            i += 1
+            j += 1
+        elif list1[i] < list2[j] and list2[j]%list1[i] == 0:
+            result.append(list1[i])
+            list2[j] //= list1[i]
+            i+=1
+        elif list2[j] < list1[i] and list1[i]%list2[j] == 0:
+            result.append(list2[j])
+            list1[i] //= list2[j]
+            j+=1
+        else:
+            raise ValueError("The tuples are not mutually refinable.")
+    if i< len(list1) or j < len(list2):
+        raise ValueError("The tuples are not mutually refinable.")
+    result = tuple(result)
+    refinedtuple1 = depth2_refinement(result,tuple1)
+    refinedtuple2 = depth2_refinement(result,tuple2)
+    return result, refinedtuple1, refinedtuple2
 
+def composability_algorithm(nestedtuple1,nestedtuple2):
+    """
+    Given tuples tuple1 = T and tuple2 = U, computes nested tuples 
+    T' and U' whose depth one reductions are T and U, and whose flattenings
+    are equal. For example 
+    T = (6,6)
+    U = (2,6,3)
+    ->
+    T' = ((2,3),(2,3))
+    U' = (2,(3,2),3)
+    flat(T') = flat(U') = (2,3,2,3)
+    """
+    tuple1 = nestedtuple1.flatten()
+    tuple2 = nestedtuple2.flatten()
+    list1  = list(tuple1)
+    list2  = list(tuple2)
+    i = 0
+    j = 0
+    result1   = []
+    cur_mode1 = []
+    result2   = []
+    cur_mode2 = []
+    while i < len(list1) and j < len(list2):
+        if list1[i] == list2[j]:
+            cur_mode1.append(list1[i])
+            result1.append(cur_mode1[0] if len(cur_mode1) == 1 else tuple(cur_mode1))
+            cur_mode1 = []
+            cur_mode2.append(list2[j])
+            result2.append(cur_mode2[0] if len(cur_mode2) == 1 else tuple(cur_mode2))
+            cur_mode2 = []
+            i += 1
+            j += 1
+        elif list1[i] < list2[j] and list2[j]%list1[i] == 0:
+            cur_mode1.append(list1[i])
+            result1.append(cur_mode1[0] if len(cur_mode1) == 1 else tuple(cur_mode1))
+            cur_mode1 = []
+            cur_mode2.append(list1[i])
+            list2[j] //= list1[i]
+            i += 1
+        elif list2[j] < list1[i] and list1[i]%list2[j] == 0:
+            cur_mode1.append(list2[j])
+            cur_mode2.append(list2[j])
+            result2.append(cur_mode2[0] if len(cur_mode2) == 1 else tuple(cur_mode2))
+            cur_mode2 = []
+            list1[i] //= list2[j]
+            j += 1
+        else:
+            raise ValueError("The given nested tuples are not mutually refinable.")
+    if i < len(list1):
+        raise ValueError("The given nested tuples are not mutually refinable.")
+    if cur_mode2 != []:
+        cur_mode2.append(list2[j])
+        result2.append(tuple(cur_mode2))
+        j+=1 
 
+    while j < len(list2):
+        result2.append(list2[j])
+        j += 1
+    
+    result1 = nestedtuple1.sub(tuple(result1))
+    result2 = nestedtuple2.sub(tuple(result2))
+    return result1, result2
 
 
 def main():  

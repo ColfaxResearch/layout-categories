@@ -273,8 +273,74 @@ class NestedTuple:
     def is_congruent_to(self,other: 'NestedTuple'):
         return self.profile().data == other.profile().data
     
+    def replace_empty_tuples_with_one(nested: 'NestedTuple') -> 'NestedTuple':
+        def _replace(obj):
+            if obj == ():  # empty tuple
+                return 1
+            elif isinstance(obj, int):
+                return obj
+            elif isinstance(obj, tuple):
+                return tuple(_replace(item) for item in obj)
+            else:
+                raise ValueError("Invalid element type.")
 
+        new_data = _replace(nested.data)
+        return NestedTuple(new_data)
     
+    def replace_empty_tuples_with_zero(nested: 'NestedTuple') -> 'NestedTuple':
+        def _replace(obj):
+            if obj == ():  # empty tuple
+                return 0
+            elif isinstance(obj, int):
+                return obj
+            elif isinstance(obj, tuple):
+                return tuple(_replace(item) for item in obj)
+            else:
+                raise ValueError("Invalid element type.")
+
+        new_data = _replace(nested.data)
+        return NestedTuple(new_data)
+    
+    def refines(self, other: 'NestedTuple') -> bool:
+        # Case 1: S = T
+        if self.data == other.data:
+            return True
+        # Case 2: T = size(S)
+        if isinstance(other.data, int) and other.data == self.size():
+            return True
+        # Case 3: rank(S) = rank(T) and mode_i(S) refines mode_i(T) for all i
+        if self.rank() == other.rank():
+            for i in range(1, self.rank() + 1):
+                if not self.mode(i).refines(other.mode(i)):
+                    return False
+            return True
+        return False
+    
+    def is_refined_by(self, other: 'NestedTuple') -> bool:
+        return other.refines(self)
+
+    def relative_mode(self,i: int, other: 'NestedTuple') -> 'NestedTuple':
+        assert self.refines(other)
+        assert 1 <= i <= other.length()
+        if i == 1 and other.data == self.size():
+            return self
+        else:
+            l = 0
+            N = 0
+            while l + other.mode(l+1).length() < i:
+                l+=1
+                N+=other.mode(l).length()
+            l+=1
+            return self.mode(l).relative_mode(i-N, other.mode(l))
+
+    def relative_flattening(self, other: 'NestedTuple') -> 'NestedTuple':
+        assert self.refines(other)
+        result_list = []
+        for i in range(1,other.length()+1):
+            result_list.append(self.relative_mode(i,other).data)
+        result = NestedTuple( tuple(result_list) )
+        return result
+
 #*************************************************************************
 # THE CATEGORY Tuple
 #*************************************************************************
@@ -710,6 +776,32 @@ class Tuple_morphism:
             raise ValueError("The given morphisms do not have the same codomain.")
         concat = self.concat(other)
         return concat.is_isomorphism()
+    
+    def to_Nest_morphism(self):
+        domain   = NestedTuple(self.domain)
+        codomain = NestedTuple(self.codomain)
+        map      = self.map
+        return Nest_morphism(domain,codomain,map)
+    
+    def flat_divide(self,other):
+        if not other.is_complementable():
+            raise ValueError("The given denominator is not complementable.")
+        if other.codomain != self.domain:
+            raise ValueError("Codomain of denominator does not equal domain of numerator")
+        
+        return other.concat(other.complement()).compose(self)
+    
+    def flat_product(self,other):
+        if not self.is_complementable():
+            raise ValueError("The first factor is not complementable")
+        if other.codomain != self.complement().domain:
+            raise ValueError("Domain of complement of first factor does not equal codomain of second factor ")
+        
+        return self.concat(other.compose(self.complement()))
+    
+        
+
+
 
 #*************************************************************************
 # THE CATEGORY NestTuple (work in progress)
@@ -759,21 +851,32 @@ class Nest_morphism:
     def __repr__(self):
         return f"Nest_morphism(domain={self.domain}, codomain={self.codomain}, map={self.map})"
     
-    def __str__(self):
-        line1 = f"{'Domain':<10} = {self.domain}"
-        line2 = f"{'Codomain':<10} = {self.codomain}"
-        line3 = f"{'Map':<10} = {self.map}"
-        max_length = max(len(line1), len(line2), len(line3))
+    # def __str__(self):
+    #     line1 = f"{'Domain':<10} = {self.domain}"
+    #     line2 = f"{'Codomain':<10} = {self.codomain}"
+    #     line3 = f"{'Map':<10} = {self.map}"
+    #     max_length = max(len(line1), len(line2), len(line3))
         
-        out = '\n'
-        out += '=' * max_length + '\n'
-        out += f'Nest_morphism {self.name}:\n'
-        out += '-' * max_length + '\n'
-        out += line1 + '\n'
-        out += line2 + '\n'
-        out += line3 + '\n'
-        out += '=' * max_length + '\n'
-        return out
+    #     out = '\n'
+    #     out += '=' * max_length + '\n'
+    #     out += f'Nest_morphism {self.name}:\n'
+    #     out += '-' * max_length + '\n'
+    #     out += line1 + '\n'
+    #     out += line2 + '\n'
+    #     out += line3 + '\n'
+    #     out += '=' * max_length + '\n'
+    #     return out
+    
+    def __str__(self):
+        """
+        Description:
+        Print the given nested tuple morphism.
+        """
+        domain_string   = str(self.domain)
+        codomain_string = str(self.codomain)
+        map_string      = str(self.map)
+        output          = domain_string + ":" + codomain_string + ":" + map_string
+        return output
     
     def flatten(self):
         domain = self.domain.flatten()
@@ -800,30 +903,6 @@ class Nest_morphism:
         :rtype: bool
         """
         return self.flatten().is_sorted()
-    
-    # def is_coalesced(self):
-    #     """
-    #     Checks if the given morphism in C is coalesced.
-        
-    #     :return: True if the given morphism is coalesced, False otherwise.
-    #     :rtype: bool
-    #     """
-    #     m = len(self.domain)
-    #     map_ = self.map
-    #     for i in range(m):
-    #         # If any entry in domain(f) is = 1, then f is not coalesced.
-    #         if self.domain[i] == 1:
-    #             return False
-    #         # If there is any instance of alpha(i)<alpha(i+1), and there does not exist 
-    #         # alpha(i)<j<alpha(i+1) with t_j = 1, then f is not coalesced. 
-    #         if (i<m-1) and (map_[i]>0) and (map_[i]<map_[i+1]):
-    #             result = False
-    #             for j in range(map_[i]+1,map_[i+1]):
-    #                 if self.codomain[j-1]>1:
-    #                     result = True
-    #             if not result:
-    #                 return False
-    #     return True
 
     def are_composable(self, g: 'Nest_morphism') -> bool:
         """
@@ -854,108 +933,6 @@ class Nest_morphism:
         
         composite = Nest_morphism(self.domain,g.codomain,self.underlying_map.compose(g.underlying_map).map)
         return composite
-        
-    # def sum(self, g: 'Tuple_morphism') -> 'Tuple_morphism':
-    #     """
-    #     Computes the sum f oplus g of two morphisms f and g in C.
-        
-    #     :param g: second morphism in sum
-    #     :type g: Tuple_morphism
-        
-    #     :return: f oplus g
-    #     :rtype: Tuple_morphism
-    #     """
-    #     sum = Tuple_morphism(self.domain+g.domain,self.codomain+g.codomain,self.underlying_map.sum(g.underlying_map).map)
-    #     return sum
-
-    # def restrict(self, subtuple: list):
-    #     """
-    #     Restricts a morphism f in C to some subtuple of its domain.
-        
-    #     :param subtuple: subtuple of the domain of f
-    #     :type subtuple: list
-        
-    #     :return: restricted morphism
-    #     :rtype: Tuple_morphism
-    #     """
-    #     if not all(1 <= index <= len(self.domain) for index in subtuple):
-    #         raise ValueError("Invalid subtuple indices.")
-        
-    #     if not all(subtuple[i] < subtuple[i+1] for i in range(len(subtuple)-1)):
-    #         raise ValueError("Subtuple must be strictly increasing.")
-        
-    #     restricted_domain = [self.domain[index-1] for index in subtuple]
-    #     restricted_map = [self.map[index-1] for index in subtuple]
-        
-    #     return Tuple_morphism(
-    #         restricted_domain,
-    #         self.codomain,
-    #         restricted_map
-    #     )
-
-    # def factorize(self, subtuple: list):
-    #     """ 
-    #     Factorizes a morphism f:(s_1,...,s_m) -> (t_1,...,t_n)
-    #     through some subtuple (t_{j_1},...,t_{j_r}) -> (t_1,...,t_n).
-        
-    #     :param subtuple: subtuple of the codomain of f
-    #     :type subtuple: list
-        
-    #     :return: factorized morphism
-    #     :rtype: Tuple_morphism
-    #     """
-    #     domain = self.domain
-    #     codomain = [self.codomain[j-1] for j in subtuple]
-
-    #     domain = self.domain
-    #     codomain = [self.codomain[j-1] for j in subtuple]
-
-    #     map_ = []
-
-    #     for value in self.map:
-    #         if value == 0:
-    #             map_.append(value)
-    #         else:
-    #             missing_count = sum(1 for i in range(1,value) if i not in subtuple)
-    #             map_.append(value - missing_count)
-
-    #     return Tuple_morphism(domain,codomain,map_)
-
-    # def sort(self):
-    #     """
-    #     Sorts the given morphism f in C.
-        
-    #     :return: sorted morphism
-    #     :rtype: Tuple_morphism
-    #     """
-    #     alpha = self.map
-
-    #     # Extract   P = The collection of indices i in <m> with alpha(i) = *,
-    #     #           Q = The collection of indices i in <m> with alpha(i) != *.
-    #     P = []
-    #     Q = []
-    #     for i,value in enumerate(alpha):
-    #         if value == 0:
-    #             P.append(i+1)
-    #         else:
-    #             Q.append(i+1)
-
-    #     #Reorder P so that i_1 < i_2 implies 
-    #     #               s_{i_1} < s_{i_2}, or 
-    #     #               s_{i_1} = s_{i_2} and i_1 < i_2
-    #     P_sorted = sorted(P, key=lambda i: (self.domain[i - 1], i))
-
-    #     # Reorder Q so that j_1 < j_2 implies alpha(j_1)<alpha(j_2)
-    #     Q_sorted = sorted(Q, key=lambda j: alpha[j - 1])
-
-    #     permutation = P_sorted+Q_sorted
-    #     domain_of_g = []
-    #     for entry in permutation:
-    #         domain_of_g.append(self.domain[entry-1])
-        
-    #     g = Tuple_morphism(domain_of_g,self.domain,permutation)
-    #     sorted_morphism = g.compose(self)
-    #     return sorted_morphism
 
     def images_are_disjoint(self, g):
         """
@@ -988,112 +965,6 @@ class Nest_morphism:
                                 self.codomain,
                                 self.underlying_map.wedge(g.underlying_map).map)
         return concat
-
-    # def squeeze(self):
-    #     """
-    #     Removes all ones from domain and codomain of f.
-        
-    #     :return: morphism with ones removed
-    #     :rtype: Tuple_morphism
-    #     """
-    #     domain_subtuple     = [i+1 for i in range(len(self.domain)) if self.domain[i] != 1]
-    #     restricted_morphism = self.restrict(domain_subtuple)
-    #     codomain_subtuple   = [j+1 for j in range(len(restricted_morphism.codomain)) if restricted_morphism.codomain[j] != 1]
-
-    #     return restricted_morphism.factorize(codomain_subtuple)
-
-    # def coalesce(self):
-    #     """Computes the coalescence of a morphism in C. 
-        
-    #     :return: A coalesced morphism in C
-    #     :rtype: Tuple_morphism
-    #     """
-    #     morphism = self.squeeze()
-    #     m = len(morphism.domain)
-    #     n = len(morphism.codomain)
-
-    #     # Form equivalence classes for domain
-    #     if m>0:
-    #         domain_equivalence_classes = []
-    #         current_equivalence_class = [1]
-
-    #         for i in range(1, m):
-    #             previous_value  = morphism.map[i - 1]
-    #             current_value   = morphism.map[i]
-
-    #             if (previous_value == 0 and current_value == 0) or ((previous_value != 0) and current_value == previous_value + 1):
-    #                 current_equivalence_class.append(i + 1)
-    #             else:
-    #                 domain_equivalence_classes.append(current_equivalence_class)
-    #                 current_equivalence_class = [i + 1]
-
-    #         domain_equivalence_classes.append(current_equivalence_class) 
-    #     else: 
-    #         domain_equivalence_classes = []
-
-    #     # Form equivalence classes for codomain
-    #     image_of_map = set(morphism.map)
-    #     if n>0:
-    #         codomain_equivalence_classes = []
-    #         current_equivalence_class = [1]
-
-    #         for j in range(2, n+1):
-    #             previous_index  = j-1
-    #             current_index   = j
-
-    #             if (j-1 not in image_of_map and j not in image_of_map):
-    #                 current_equivalence_class.append(j)
-    #             elif (j-1 in image_of_map):
-    #                 i=0
-    #                 while morphism.map[i] != j-1:
-    #                     i+=1
-    #                 if (i+1 < m) and (morphism.map[i+1] == j):
-    #                     current_equivalence_class.append(j)
-    #                 else:
-    #                     codomain_equivalence_classes.append(current_equivalence_class)
-    #                     current_equivalence_class = [j]
-    #             else:
-    #                 codomain_equivalence_classes.append(current_equivalence_class)
-    #                 current_equivalence_class = [j]
-
-    #         codomain_equivalence_classes.append(current_equivalence_class) 
-    #     else: codomain_equivalence_classes = [] 
-
-    #     coalesced_domain   = []
-    #     for i in range(len(domain_equivalence_classes)):
-    #         equivalence_class = domain_equivalence_classes[i]
-    #         product = 1
-    #         for index in equivalence_class:
-    #             product *= morphism.domain[index-1]
-    #         coalesced_domain.append(product)
-        
-    #     coalesced_codomain = []
-    #     for j in range(len(codomain_equivalence_classes)):
-    #         equivalence_class = codomain_equivalence_classes[j]
-    #         product = 1
-    #         for index in equivalence_class:
-    #             product *= morphism.codomain[index-1]
-    #         coalesced_codomain.append(product)
-
-    #     coalesced_map = []
-    #     for i in range(len(coalesced_domain)):
-    #         domain_representative = domain_equivalence_classes[i][0]
-    #         codomain_representative = morphism.map[domain_representative-1]
-    #         if morphism.map[domain_representative-1] == 0: 
-    #             coalesced_map.append(0)
-    #         else: 
-    #             index = 0
-    #             while (index < len(coalesced_codomain)) and (codomain_representative not in codomain_equivalence_classes[index]):
-    #                 index+=1
-    #             coalesced_map.append(index+1)
-
-    #     return Tuple_morphism(coalesced_domain,coalesced_codomain,coalesced_map)
-    
-    #     def is_admissible_for_complementation(self):
-    #         if 0 in set(self.map):
-    #             return False
-    #         else:
-    #             return True 
         
     def is_complementable(self):
         """
@@ -1123,6 +994,7 @@ class Nest_morphism:
         domain = [codomain[i] for i in range(codomain.length()) if i+1 not in image_indices]
         domain = NestedTuple(tuple(domain))
         map = tuple([i+1 for i in range(codomain.length()) if i+1 not in image_indices])
+
         return Nest_morphism(domain,codomain,map)
     
     def is_isomorphism(self):
@@ -1153,5 +1025,43 @@ class Nest_morphism:
             return True
         else:
             return False
+        
+    def flatten_codomain(self):
+        domain   = self.domain
+        codomain = NestedTuple(self.codomain.flatten())
+        map      = self.map
+        return Nest_morphism(domain,codomain,map)
+
+    def logical_divide(self,other):
+        self_bar = self.flatten().to_Nest_morphism()
+        other_bar = other.flatten_codomain()
+        return other_bar.concat(other_bar.complement()).compose(self_bar)
+
+    def logical_product(self,other):
+        other_bar = other.flatten_codomain()
+        result = self.concat(other_bar.compose(self.complement()))
+        return result
 
 
+def check_algorithm(X : list,Y : list):
+    result = []
+    mode = []
+    while len(Y) > 0 and not (len(X) <= len(Y) and X[:len(Y)] == Y):
+        if X[0] == Y[0]:
+            mode.append(X[0])
+            result.append(mode)
+            mode = []
+            X = X[1:]
+            Y = Y[1:]
+        elif X[0] < Y[0] and Y[0] % X[0] == 0:
+            mode.append(X[0])
+            Y[0] = Y[0] // X[0]
+            X = X[1:]
+        elif Y[0] < X[0] and X[0] % Y[0] == 0:
+            mode.append(Y[0])
+            X[0] = X[0] // Y[0]
+            Y = Y[1:]
+        else:
+            return False
+    result.append(mode)
+    return result
