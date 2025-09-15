@@ -28,103 +28,94 @@ def random_ordered_subtuple(m: int, k: int) -> tuple:
     sampled = random.sample(range(1, m+1), k)
     return tuple(sampled)
 
-def random_Fin_morphism(min_length = 0, max_length = 9):
-    """
-    Description:
-    Randomly generate a morphism in Fin_*
-    """
-    domain   = np.random.randint(1,max_length)
-    codomain = np.random.randint(1,max_length)
-    map_     = [0 for _ in range(domain)]
+def rand_Fin_morphism(domain = None, codomain = None, min_length = 0, max_length = 9):
+    if domain is None:
+        domain = np.random.randint(min_length,max_length+1)
+    if codomain is None:
+        codomain = np.random.randint(min_length,max_length+1)
+
+    permutation1_map = tuple(int(x) for x in np.random.permutation(range(1, domain+1)))
+    permutation1     = Fin_morphism(domain,domain, permutation1_map)
 
     max_size      = min(domain, codomain)
     u             = np.random.rand()
     skewed        = 1 - u**3 # skew toward larger values
     size_of_image = int(np.round(skewed * max_size))
-    size_of_image = max(0, min(size_of_image, max_size))
+    projection_map = list(range(1,size_of_image+1))
+    for _ in range(domain - size_of_image):
+        projection_map.append(0)
+    projection_map = tuple(projection_map)
+    projection     = Fin_morphism(domain,size_of_image, projection_map)
 
-    image             = random_ordered_subtuple(codomain, size_of_image)
-    surviving_indices = sorted(random_ordered_subtuple(domain, size_of_image))
-    for i, index in enumerate(surviving_indices):
-        map_[index - 1] = int(image[i])
-    map_ = tuple(map_)
+    inclusion_map = tuple(range(1,size_of_image+1))
+    inclusion   = Fin_morphism(size_of_image,codomain, inclusion_map)
 
-    return Fin_morphism(domain, codomain, map_)
+    permutation2_map = tuple(int(x) for x in np.random.permutation(range(1, codomain+1)))
+    permutation2     = Fin_morphism(codomain,codomain, permutation2_map)
+
+    result = permutation1.compose(projection).compose(inclusion).compose(permutation2)
+    return result
+
+def rand_Fin_complementable_morphism(domain = None, codomain = None, min_length = 0, max_length = 9):
+    if domain is None:
+        domain = np.random.randint(min_length,max_length+1)
+    if codomain is None:
+        codomain = np.random.randint(domain,max_length+1)
+
+    permutation1_map = tuple(int(x) for x in np.random.permutation(range(1, domain+1)))
+    permutation1     = Fin_morphism(domain,domain, permutation1_map)
+
+    inclusion_map = tuple(range(1,domain+1))
+    inclusion   = Fin_morphism(domain,codomain, inclusion_map)
+
+    permutation2_map = tuple(int(x) for x in np.random.permutation(range(1, codomain+1)))
+    permutation2     = Fin_morphism(codomain,codomain, permutation2_map)
+
+    result = permutation1.compose(inclusion).compose(permutation2)
+    return result
+
+def rand_Tuple_morphism(domain = None, codomain = None, min_length = 0, max_length = 9, max_value = 1024):
+    assert (domain is None) or (codomain is None)
+
+    if domain is not None:
+        domain_length = len(domain)
+        codomain_length = np.random.randint(min_length,max_length)
+        underlying_map = rand_Fin_morphism(domain_length,codomain_length).map
+        codomain = []
+        for j in range(1,codomain_length+1):
+            if j not in underlying_map:
+                codomain.append(np.random.randint(1,max_value))
+            else:
+                codomain.append(domain[underlying_map.index(j)])
+        codomain = tuple(codomain)
+        return Tuple_morphism(domain,codomain,underlying_map)
     
-def random_Tuple_morphism(min_length = 0, max_length = 9, max_value = 10):
-    """
-    Description:
-    Randomly generates a tuple morphism f.
-    """
-    domain_length   = np.random.randint(min_length,max_length)
-    codomain_length = np.random.randint(min_length,max_length)
-    map_            = [0 for _ in range(domain_length)]
+    else:
+        domain_length = int(np.random.randint(min_length,max_length))
 
-    max_size      = min(domain_length, codomain_length)
-    u             = np.random.rand()
-    skewed        = 1 - u**3 # skew toward larger values
-    size_of_image = int(np.round(skewed * max_size))
-    size_of_image = max(0, min(size_of_image, max_size))
+        if codomain is None: 
+            codomain_length = np.random.randint(min_length,max_length)
+            codomain = []
+            for _ in range(codomain_length):
+                codomain.append(np.random.randint(1,max_value))
+            codomain = tuple(codomain)
+        codomain_length = len(codomain)
+        
+        underlying_Fin_morphism = rand_Fin_morphism(domain = domain_length, codomain = codomain_length)
+        underlying_map = underlying_Fin_morphism.map
+        domain = []
+        for i in range(1,domain_length+1):
+            if underlying_map[i-1]>0:
+                domain.append(codomain[underlying_map[i-1]-1])
+            else:
+                domain.append(np.random.randint(1,max_value))
+        domain = tuple(domain)
+        return Tuple_morphism(domain,codomain,underlying_map)
 
-    image             = random_ordered_subtuple(codomain_length, size_of_image)
-    surviving_indices = sorted(random_ordered_subtuple(domain_length, size_of_image))
-    for i, index in enumerate(surviving_indices):
-        map_[index - 1] = int(image[i])
-    map_ = tuple(map_)
-
-    domain = []
-    for i in range(domain_length):
-        domain.append(int(np.random.randint(1,max_value)))
-    domain = tuple(domain)
-    
-    codomain = []
-    for j in range(codomain_length):
-        codomain.append(int(np.random.randint(1,max_value)))
-    
-    for i,value in enumerate(map_):
-        if value>0:
-            codomain[value-1] = domain[i]
-    codomain = tuple(codomain) 
-
-    return Tuple_morphism(domain,codomain, map_)
-
-def random_Tuple_composable_morphisms(min_length = 0, max_length = 9, max_value = 10):
-    """
-    Description:
-    Randomly generate a pair of composable tuple morphisms f and g.
-    """
-    f = random_Tuple_morphism(min_length = min_length, max_length = max_length, max_value = max_value)
-
-    domain        = f.codomain
-    domain_length = len(domain)
-
-    codomain_length = np.random.randint(min_length,max_length+1)
-    codomain        = []
-    for k in range(codomain_length):
-        codomain.append(np.random.randint(1,max_value+1))
-
-    map_ = [0 for _ in range(domain_length)]
-
-    max_size      = min(domain_length, codomain_length)
-    u             = np.random.rand()
-    skewed        = 1 - u**3 # skew toward larger values
-    size_of_image = int(np.round(skewed * max_size))
-    size_of_image = max(0, min(size_of_image, max_size))
-
-    image             = random_ordered_subtuple(codomain_length,size_of_image)
-    surviving_indices = sorted(random_ordered_subtuple(domain_length,size_of_image))
-    for i,index in enumerate(surviving_indices):
-        map_[index-1] = image[i]
-    map_ = tuple(map_)
-
-    for i,value in enumerate(map_):
-        if value>0:
-            codomain[value-1] = domain[i]
-    codomain = tuple(codomain)
-
-    g = Tuple_morphism(domain,codomain,map_)
-
-    return f, g 
+def rand_Tuple_composable_morphisms(min_length = 0, max_length = 9, max_value = 10):
+    f = rand_Tuple_morphism(min_length = min_length, max_length = max_length, max_value = max_value)
+    g = rand_Tuple_morphism(domain = f.codomain, min_length = min_length, max_length = max_length, max_value = max_value)
+    return f, g
 
 def random_Tuple_morphisms_with_disjoint_images(min_length = 0, max_length = 9, max_value = 10):
     """
@@ -190,6 +181,41 @@ def random_Tuple_complementable_morphism(min_length = 2, max_length = 9, max_val
     domain = tuple(domain)
     
     return Tuple_morphism(domain,codomain,map_)
+
+def rand_Tuple_complementable_morphism(domain = None, codomain = None, min_length = 0, max_length = 9, max_value = 1024):
+    assert not (domain and codomain)
+
+    if domain is not None:
+        domain_length = len(domain)
+        codomain_length = np.random.randint(domain_length,max_length)
+        underlying_map = rand_Fin_complementable_morphism(domain_length,codomain_length).map
+        codomain = []
+        for j in range(1,codomain_length+1):
+            if j not in underlying_map:
+                codomain.append(np.random.randint(1,max_value))
+            else:
+                codomain.append(domain[underlying_map.index(j)])
+        codomain = tuple(codomain)
+        return Tuple_morphism(domain,codomain,underlying_map)
+    
+    else:
+        domain_length = int(np.random.randint(min_length,max_length))
+
+        if codomain is None: 
+            codomain_length = np.random.randint(domain_length,max_length)
+            codomain = []
+            for _ in range(codomain_length):
+                codomain.append(np.random.randint(1,max_value))
+            codomain = tuple(codomain)
+        codomain_length = len(codomain)
+        
+        underlying_Fin_morphism = rand_Fin_complementable_morphism(domain = domain_length, codomain = codomain_length)
+        underlying_map = underlying_Fin_morphism.map
+        domain = []
+        for i in range(1,domain_length+1):
+            domain.append(codomain[underlying_map[i-1]-1])
+        domain = tuple(domain)
+        return Tuple_morphism(domain,codomain,underlying_map)
 
 def random_Tuple_divisible_morphisms(min_length = 2, max_length = 9, max_value = 10):
     """
@@ -273,22 +299,36 @@ def random_NestedTuple(length=5, max_depth=4, max_width=5, int_range=(1, 10)):
 def random_profile(length = 5, max_depth = 4, max_width = 5):
     return random_NestedTuple(length = length, max_depth = max_depth, max_width = max_width, int_range = (0,0))
 
-def random_Nest_morphism():
-    flat_morphism = random_Tuple_morphism()
+def random_Nest_morphism(domain = None, codomain = None):
+    flat_morphism = rand_Tuple_morphism()
     flat_domain   = flat_morphism.domain
     flat_codomain = flat_morphism.codomain
     domain        = random_profile(length = len(flat_domain)).sub(flat_domain)
     codomain      = random_profile(length = len(flat_codomain)).sub(flat_codomain)
     return Nest_morphism(domain,codomain,flat_morphism.map)
 
-def random_Nest_composable_morphisms():
-    flat_f, flat_g = random_Tuple_composable_morphisms()
-    domain_f   = random_profile(length = len(flat_f.domain)).sub(flat_f.domain)
-    codomain_f = random_profile(length = len(flat_f.codomain)).sub(flat_f.codomain)
-    domain_g   = codomain_f
-    codomain_g = random_profile(length = len(flat_g.codomain)).sub(flat_g.codomain)
-    f = Nest_morphism(domain_f,codomain_f,flat_f.map)
-    g = Nest_morphism(domain_g,codomain_g,flat_g.map)
+def rand_Nest_morphism(domain = None, codomain = None, min_length = 0, max_length = 9, max_value = 1024):
+    assert (domain is None) or (codomain is None)
+    if domain is not None:
+        flat_morphism = rand_Tuple_morphism(domain = domain.flatten(), min_length = min_length, max_length = max_length, max_value = max_value)
+        flat_codomain = flat_morphism.codomain
+        codomain = random_profile(length = len(flat_codomain)).sub(flat_codomain)
+    elif codomain is not None:
+        flat_morphism = rand_Tuple_morphism(codomain = codomain.flatten(), min_length = min_length, max_length = max_length, max_value = max_value)
+        flat_domain = flat_morphism.domain
+        domain = random_profile(length = len(flat_domain)).sub(flat_domain)
+    else:
+        flat_morphism = rand_Tuple_morphism(min_length = min_length, max_length = max_length, max_value = max_value)
+        flat_domain   = flat_morphism.domain
+        flat_codomain = flat_morphism.codomain
+        domain        = random_profile(length = len(flat_domain)).sub(flat_domain)
+        codomain      = random_profile(length = len(flat_codomain)).sub(flat_codomain)
+    return Nest_morphism(domain,codomain,flat_morphism.map)
+
+
+def rand_Nest_composable_morphisms(min_length = 0, max_length = 10, max_value = 1024):
+    f = rand_Nest_morphism(min_length = min_length, max_length = max_length, max_value = max_value)
+    g = rand_Nest_morphism(domain = f.codomain, min_length = min_length, max_length = max_length, max_value = max_value)
     return f, g
 
 def random_Nest_morphisms_with_disjoint_images():
@@ -332,3 +372,149 @@ def random_Nest_productable_morphisms(min_length = 2, max_length = 9, max_value 
     f = Nest_morphism(domain_f,codomain_f,map_f)
     g = Nest_morphism(domain_g,codomain_g,map_g)
     return f,g
+
+def random_mutually_refinable_nested_tuples():
+    length1 = np.random.randint(1, 10)
+    list1   = []
+    size1   = 1
+    for _ in range(length1):
+        power = np.random.randint(1,6)
+        list1.append(2**power)
+        size1 *= 2**power
+
+    list2 = []
+    size2 = 1
+    while size2 < size1:
+        power = np.random.randint(1,6)
+        list2.append(2**power)
+        size2 *= 2**power
+    tuple1 = tuple(list1)
+    tuple2 = tuple(list2)
+    profile1 = random_profile(length = len(tuple1), max_depth = 3)
+    profile2 = random_profile(length = len(tuple2), max_depth = 3)
+    nestedtuple1 = profile1.sub(tuple1)
+    nestedtuple2 = profile2.sub(tuple2)
+
+    return nestedtuple1, nestedtuple2 
+
+def random_weakly_composable_nest_morphisms():
+    T,U = random_mutually_refinable_nested_tuples()
+
+    f = rand_Nest_morphism(codomain = T)
+    g = rand_Nest_morphism(domain = U)
+
+    return f,g
+
+
+
+
+
+
+
+# OLD STUFF
+
+def random_Fin_morphism(min_length = 0, max_length = 9):
+    """
+    Description:
+    Randomly generate a morphism in Fin_*
+    """
+    domain   = np.random.randint(1,max_length)
+    codomain = np.random.randint(1,max_length)
+    map_     = [0 for _ in range(domain)]
+
+    max_size      = min(domain, codomain)
+    u             = np.random.rand()
+    skewed        = 1 - u**3 # skew toward larger values
+    size_of_image = int(np.round(skewed * max_size))
+    size_of_image = max(0, min(size_of_image, max_size))
+
+    image             = random_ordered_subtuple(codomain, size_of_image)
+    surviving_indices = sorted(random_ordered_subtuple(domain, size_of_image))
+    for i, index in enumerate(surviving_indices):
+        map_[index - 1] = int(image[i])
+    map_ = tuple(map_)
+
+    return Fin_morphism(domain, codomain, map_)
+
+def random_Tuple_morphism(min_length = 0, max_length = 9, max_value = 10):
+    """
+    Description:
+    Randomly generates a tuple morphism f.
+    """
+    domain_length   = np.random.randint(min_length,max_length)
+    codomain_length = np.random.randint(min_length,max_length)
+    map_            = [0 for _ in range(domain_length)]
+
+    max_size      = min(domain_length, codomain_length)
+    u             = np.random.rand()
+    skewed        = 1 - u**3 # skew toward larger values
+    size_of_image = int(np.round(skewed * max_size))
+    size_of_image = max(0, min(size_of_image, max_size))
+
+    image             = random_ordered_subtuple(codomain_length, size_of_image)
+    surviving_indices = sorted(random_ordered_subtuple(domain_length, size_of_image))
+    for i, index in enumerate(surviving_indices):
+        map_[index - 1] = int(image[i])
+    map_ = tuple(map_)
+
+    domain = []
+    for i in range(domain_length):
+        domain.append(int(np.random.randint(1,max_value)))
+    domain = tuple(domain)
+    
+    codomain = []
+    for j in range(codomain_length):
+        codomain.append(int(np.random.randint(1,max_value)))
+    
+    for i,value in enumerate(map_):
+        if value>0:
+            codomain[value-1] = domain[i]
+    codomain = tuple(codomain) 
+
+    return Tuple_morphism(domain,codomain, map_)
+
+def random_Tuple_composable_morphisms(min_length = 0, max_length = 9, max_value = 10):
+    """
+    Description:
+    Randomly generate a pair of composable tuple morphisms f and g.
+    """
+    f = random_Tuple_morphism(min_length = min_length, max_length = max_length, max_value = max_value)
+
+    domain        = f.codomain
+    domain_length = len(domain)
+
+    codomain_length = np.random.randint(min_length,max_length+1)
+    codomain        = []
+    for k in range(codomain_length):
+        codomain.append(np.random.randint(1,max_value+1))
+
+    map_ = [0 for _ in range(domain_length)]
+
+    max_size      = min(domain_length, codomain_length)
+    u             = np.random.rand()
+    skewed        = 1 - u**3 # skew toward larger values
+    size_of_image = int(np.round(skewed * max_size))
+    size_of_image = max(0, min(size_of_image, max_size))
+
+    image             = random_ordered_subtuple(codomain_length,size_of_image)
+    surviving_indices = sorted(random_ordered_subtuple(domain_length,size_of_image))
+    for i,index in enumerate(surviving_indices):
+        map_[index-1] = image[i]
+    map_ = tuple(map_)
+
+    for i,value in enumerate(map_):
+        if value>0:
+            codomain[value-1] = domain[i]
+    codomain = tuple(codomain)
+
+    g = Tuple_morphism(domain,codomain,map_)
+
+    return f, g 
+
+
+
+
+
+
+
+

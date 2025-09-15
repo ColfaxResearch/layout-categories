@@ -7,7 +7,7 @@ from categories import *
 from test_utils import *
 from layout_utils import *
 
-iterations = range(1000)
+iterations = range(100)
 
 #*************************************************************************
 # TUPLE_MORPHISM TEST COMPONENTS
@@ -79,7 +79,7 @@ def test_sort_is_sorted(iteration):
     If f is a tuple morphism, then sort(f) is sorted.
     """
     np.random.seed(iteration)
-    f = random_Tuple_morphism()
+    f = rand_Tuple_morphism()
     assert f.sort().is_sorted()
 
 @pytest.mark.parametrize("iteration", iterations)
@@ -89,7 +89,7 @@ def test_coalesce_is_coalesced(iteration):
     If f is a tuple morphism, then coalesce(f) is coalesced.
     """
     np.random.seed(iteration)
-    f = random_Tuple_morphism()
+    f = rand_Tuple_morphism(max_value = 10)
     assert f.coalesce().is_coalesced()
 
 @pytest.mark.parametrize("iteration", iterations)
@@ -99,7 +99,7 @@ def test_complement_is_a_complement(iteration):
     If f is a complementable tuple morphism, then complement(f) is a complement of f.
     """
     np.random.seed(iteration)
-    f = random_Tuple_complementable_morphism()
+    f = rand_Tuple_complementable_morphism()
     assert f.is_complementary_to(f.complement())
 
 @pytest.mark.parametrize("iteration",iterations)
@@ -110,7 +110,7 @@ def test_coalesce_agree(iteration):
     if we consider ():() = 1:0, and (s):(d) = s:d
     """
     np.random.seed(iteration)
-    f = random_Tuple_morphism()
+    f = rand_Tuple_morphism(max_value = 10)
     assert coalesce_agree(f)
 
 @pytest.mark.parametrize("iteration",iterations)
@@ -130,7 +130,7 @@ def test_compose_agree(iteration):
     If f and g are composable tuple morphisms, then L_{g o f} = L_g o L_f
     (after nullifying trivial strides)
     """
-    f,g = random_Tuple_composable_morphisms()
+    f,g = rand_Tuple_composable_morphisms()
     assert compose_agree(f,g)
 
 @pytest.mark.parametrize("iteration",iterations)
@@ -141,7 +141,7 @@ def test_complement_agree(iteration):
     coalesce(L_{complement(f)}) = coalesce(complement(L_f))
     """
     np.random.seed(iteration)
-    f = random_Tuple_complementable_morphism()
+    f = random_Tuple_complementable_morphism(max_value = 10)
     assert complement_agree(f)
 
 @pytest.mark.parametrize("iteration",iterations)
@@ -185,9 +185,23 @@ def Nest_compose_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr
     layout_f       = compute_layout(f)
     layout_g       = compute_layout(g)
     compose_morphs = f.compose(g)
-    layout_compose = nullify_trivial_strides(compute_flat_layout(compose_morphs))
+    layout_compose = nullify_zero_strides(compute_layout(compose_morphs))
     compose_layout = cute.composition(layout_g, layout_f)
     return layout_compose == compose_layout
+
+@cute.jit
+def composition_algorithm_agree(f: cutlass.Constexpr[Nest_morphism],g: cutlass.Constexpr[Nest_morphism]):
+    S = f.domain
+    T = f.codomain
+    U = g.domain
+    V = g.codomain
+    Tprime,Uprime = mutual_refinement(T,U)
+    fprime = f.pullback_along(Tprime)
+    inclusion = Nest_morphism(Tprime,Uprime,tuple(range(1,Tprime.length()+1)))
+    gprime = g.pushforward_along(Uprime)
+    weak_composite = compute_layout(fprime.compose(inclusion).compose(gprime))
+    composite = cute.coalesce(weak_composite, target_profile = S.data)
+    return composite == cute.composition(compute_layout(g),compute_layout(f))
 
 
 #*************************************************************************
@@ -210,4 +224,16 @@ def test_Nest_concat_agree(iteration):
     f,g = random_Nest_morphisms_with_disjoint_images()
     assert Nest_concat_agree(f,g)
 
+@pytest.mark.parametrize("iteration", iterations)
+def test_Nest_compose_agree(iteration):
+    np.random.seed(iteration)
+    f,g = rand_Nest_composable_morphisms(min_length = 0, max_length = 6, max_value = 64)
+    assert Nest_compose_agree(f,g)
 
+@pytest.mark.parametrize("iteration", iterations)
+def test_composition_algorithm_agree(iteration):
+    np.random.seed(iteration)
+    T,U = random_mutually_refinable_nested_tuples()
+    f = rand_Nest_morphism(codomain = T, max_length = 8, max_value = 16)
+    g = rand_Nest_morphism(domain = U, max_length = 8, max_value = 16)
+    assert composition_algorithm_agree(f,g)

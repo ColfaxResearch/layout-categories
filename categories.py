@@ -64,7 +64,7 @@ class Fin_morphism:
         domain_string   = str(self.domain)
         codomain_string = str(self.codomain)
         map_string      = str(self.map)
-        output          = domain_string + ":" + codomain_string + ":" + map_string
+        output          = "<"+domain_string+">* -" + map_string + "-> <"+codomain_string+">*"
         return output
     
     def __repr__(self):
@@ -327,7 +327,7 @@ class NestedTuple:
         else:
             l = 0
             N = 0
-            while l + other.mode(l+1).length() < i:
+            while N + other.mode(l+1).length() < i:
                 l+=1
                 N+=other.mode(l).length()
             l+=1
@@ -340,6 +340,22 @@ class NestedTuple:
             result_list.append(self.relative_mode(i,other).data)
         result = NestedTuple( tuple(result_list) )
         return result
+
+    def underlying_map(self,other: 'NestedTuple') -> tuple:
+        assert self.refines(other)
+        map_ = []
+        for i in range(1,other.length()+1):
+            for _ in range(self.relative_mode(i,other).length()):
+                map_.append(i)
+        return tuple(map_)
+
+    def sublength(self,i: int, refined: 'NestedTuple') -> int:
+        assert 1 <= i <= self.length()
+        result = 0
+        for j in range(1,i):
+            result += self.relative_mode(j, refined).length()
+        return result
+
 
 #*************************************************************************
 # THE CATEGORY Tuple
@@ -413,7 +429,7 @@ class Tuple_morphism:
         domain_string   = str(self.domain)
         codomain_string = str(self.codomain)
         map_string      = str(self.map)
-        output          = domain_string + ":" + codomain_string + ":" + map_string
+        output          = domain_string + "-" + map_string + "->" + codomain_string
         return output
     
     def size(self):
@@ -640,7 +656,7 @@ class Tuple_morphism:
 
         return restricted_morphism.factorize(codomain_subtuple)
 
-    def coalesce(self):
+    def strong_coalesce(self):
         """Computes the coalescence of a morphism in C. 
         
         :return: A coalesced morphism in C
@@ -718,7 +734,178 @@ class Tuple_morphism:
 
         return Tuple_morphism(tuple(coalesced_domain),tuple(coalesced_codomain),tuple(coalesced_map))
 
+    def coalesce(self):
+        """Computes the weak coalescence of a morphism in C. 
         
+        :return: A coalesced morphism in C
+        :rtype: Tuple_morphism
+        """
+        morphism = self.squeeze()
+        m = len(morphism.domain)
+        n = len(morphism.codomain)
+
+        # Form equivalence classes for domain
+        if m>0:
+            domain_equivalence_classes = []
+            current_equivalence_class = [1]
+            for i in range(1, m):
+                previous_value  = morphism.map[i - 1]
+                current_value   = morphism.map[i]
+                if (previous_value == 0 and current_value == 0) or ((previous_value != 0) and current_value == previous_value + 1):
+                    current_equivalence_class.append(i + 1)
+                else:
+                    domain_equivalence_classes.append(current_equivalence_class)
+                    current_equivalence_class = [i + 1]
+            domain_equivalence_classes.append(current_equivalence_class) 
+        else: 
+            domain_equivalence_classes = []
+
+        # Form equivalence classes for codomain
+        image_of_map = set(morphism.map)
+        if n>0:
+            codomain_equivalence_classes = []
+            current_equivalence_class = [1]
+            for j in range(2, n+1):
+                previous_index  = j-1
+                current_index   = j
+                if (j-1 in image_of_map):
+                    i=0
+                    while morphism.map[i] != j-1:
+                        i+=1
+                    if (i+1 < m) and (morphism.map[i+1] == j):
+                        current_equivalence_class.append(j)
+                    else:
+                        codomain_equivalence_classes.append(current_equivalence_class)
+                        current_equivalence_class = [j]
+                else:
+                    codomain_equivalence_classes.append(current_equivalence_class)
+                    current_equivalence_class = [j]
+            codomain_equivalence_classes.append(current_equivalence_class) 
+        else: codomain_equivalence_classes = [] 
+        coalesced_domain   = []
+        for i in range(len(domain_equivalence_classes)):
+            equivalence_class = domain_equivalence_classes[i]
+            product = 1
+            for index in equivalence_class:
+                product *= morphism.domain[index-1]
+            coalesced_domain.append(product)
+        coalesced_codomain = []
+        for j in range(len(codomain_equivalence_classes)):
+            equivalence_class = codomain_equivalence_classes[j]
+            product = 1
+            for index in equivalence_class:
+                product *= morphism.codomain[index-1]
+            coalesced_codomain.append(product)
+        coalesced_map = []
+        for i in range(len(coalesced_domain)):
+            domain_representative = domain_equivalence_classes[i][0]
+            codomain_representative = morphism.map[domain_representative-1]
+            if morphism.map[domain_representative-1] == 0: 
+                coalesced_map.append(0)
+            else: 
+                index = 0
+                while (index < len(coalesced_codomain)) and (codomain_representative not in codomain_equivalence_classes[index]):
+                    index+=1
+                coalesced_map.append(index+1)
+
+        return Tuple_morphism(tuple(coalesced_domain),tuple(coalesced_codomain),tuple(coalesced_map))
+
+    def coalesce_with_equiv(self):
+        """Computes the weak coalescence of a morphism in C. 
+        
+        :return: A coalesced morphism in C
+        :rtype: Tuple_morphism
+        """
+        morphism = self.squeeze()
+        m = len(morphism.domain)
+        n = len(morphism.codomain)
+
+        # Form equivalence classes for domain
+        if m>0:
+            domain_equivalence_classes = []
+            current_equivalence_class = [1]
+            for i in range(1, m):
+                previous_value  = morphism.map[i - 1]
+                current_value   = morphism.map[i]
+                if (previous_value == 0 and current_value == 0) or ((previous_value != 0) and current_value == previous_value + 1):
+                    current_equivalence_class.append(i + 1)
+                else:
+                    domain_equivalence_classes.append(current_equivalence_class)
+                    current_equivalence_class = [i + 1]
+            domain_equivalence_classes.append(current_equivalence_class) 
+        else: 
+            domain_equivalence_classes = []
+
+        # Form equivalence classes for codomain
+        image_of_map = set(morphism.map)
+        if n>0:
+            codomain_equivalence_classes = []
+            current_equivalence_class = [1]
+            for j in range(2, n+1):
+                previous_index  = j-1
+                current_index   = j
+                if (j-1 in image_of_map):
+                    i=0
+                    while morphism.map[i] != j-1:
+                        i+=1
+                    if (i+1 < m) and (morphism.map[i+1] == j):
+                        current_equivalence_class.append(j)
+                    else:
+                        codomain_equivalence_classes.append(current_equivalence_class)
+                        current_equivalence_class = [j]
+                else:
+                    codomain_equivalence_classes.append(current_equivalence_class)
+                    current_equivalence_class = [j]
+            codomain_equivalence_classes.append(current_equivalence_class) 
+        else: codomain_equivalence_classes = [] 
+        coalesced_domain   = []
+        for i in range(len(domain_equivalence_classes)):
+            equivalence_class = domain_equivalence_classes[i]
+            product = 1
+            for index in equivalence_class:
+                product *= morphism.domain[index-1]
+            coalesced_domain.append(product)
+        coalesced_codomain = []
+        for j in range(len(codomain_equivalence_classes)):
+            equivalence_class = codomain_equivalence_classes[j]
+            product = 1
+            for index in equivalence_class:
+                product *= morphism.codomain[index-1]
+            coalesced_codomain.append(product)
+        coalesced_map = []
+        for i in range(len(coalesced_domain)):
+            domain_representative = domain_equivalence_classes[i][0]
+            codomain_representative = morphism.map[domain_representative-1]
+            if morphism.map[domain_representative-1] == 0: 
+                coalesced_map.append(0)
+            else: 
+                index = 0
+                while (index < len(coalesced_codomain)) and (codomain_representative not in codomain_equivalence_classes[index]):
+                    index+=1
+                coalesced_map.append(index+1)
+
+        return Tuple_morphism(tuple(coalesced_domain),tuple(coalesced_codomain),tuple(coalesced_map)), codomain_equivalence_classes
+
+    def update_codomain(self, equivalence_relation: list) -> 'Tuple_morphism':
+        new_codomain = []
+        for class_ in equivalence_relation:
+            new_entry = 1
+            for representative in class_:
+                new_entry *= self.codomain[representative-1]
+            new_codomain.append(new_entry)
+        new_map = []
+        for i in range(1,len(self.map)+1):
+            if self.map[i-1] == 0:
+                new_map.append(0)
+            else:
+                for j, class_ in enumerate(equivalence_relation):
+                    if self.map[i-1] in class_:
+                        new_map.append(j+1)
+                        break
+        new_codomain = tuple(new_codomain)
+        new_map = tuple(new_map)
+        return Tuple_morphism(self.domain, new_codomain, new_map)
+
     def is_complementable(self):
         """
         Checks if morphism is complementable.
@@ -875,7 +1062,7 @@ class Nest_morphism:
         domain_string   = str(self.domain)
         codomain_string = str(self.codomain)
         map_string      = str(self.map)
-        output          = domain_string + ":" + codomain_string + ":" + map_string
+        output          = domain_string + "-" + map_string + "->" + codomain_string
         return output
     
     def flatten(self):
@@ -1042,26 +1229,54 @@ class Nest_morphism:
         result = self.concat(other_bar.compose(self.complement()))
         return result
 
+    def pullback_along(self,refinement: 'NestedTuple') -> 'Nest_morphism':
+        S = self.domain
+        T = self.codomain
+        Tprime = refinement
+        assert Tprime.refines(T)
+        Sprime = []
+        map_  = []
+        for i in range(1,S.length()+1):
+            if self.map[i-1] != 0:
+                j = self.map[i-1]
+                Sprime.append(Tprime.relative_mode(j,T).data)
+                for k in range(Tprime.relative_mode(j,T).length()):
+                    map_.append(Tprime.sublength(j,T)+k+1)
+            else:
+                Sprime.append(S.entry(i))
+                map_.append(0)
+        Sprime = S.sub(tuple(Sprime))
+        map_   = tuple(map_)
+        pullback = Nest_morphism(Sprime,refinement,map_)
+        return pullback
 
-def check_algorithm(X : list,Y : list):
-    result = []
-    mode = []
-    while len(Y) > 0 and not (len(X) <= len(Y) and X[:len(Y)] == Y):
-        if X[0] == Y[0]:
-            mode.append(X[0])
-            result.append(mode)
-            mode = []
-            X = X[1:]
-            Y = Y[1:]
-        elif X[0] < Y[0] and Y[0] % X[0] == 0:
-            mode.append(X[0])
-            Y[0] = Y[0] // X[0]
-            X = X[1:]
-        elif Y[0] < X[0] and X[0] % Y[0] == 0:
-            mode.append(Y[0])
-            X[0] = X[0] // Y[0]
-            Y = Y[1:]
-        else:
-            return False
-    result.append(mode)
-    return result
+    def pushforward_along(self,refinement:'NestedTuple') -> 'Nest_morphism':
+        U = self.domain
+        V = self.codomain
+        Uprime = refinement
+        assert Uprime.refines(U)
+        Vprime = []
+        for j in range(1,V.length()+1):
+            if j not in set(self.map):
+                Vprime.append(V.entry(j))
+            else:
+                i=self.map.index(j)+1
+                Vprime.append(Uprime.relative_mode(i,U).data)
+        Vprime = tuple(Vprime)
+        Vprime = V.sub(Vprime)
+        map_ = []
+        for i in range(1,U.length()+1):
+            if self.map[i-1] == 0:
+                for k in range(Uprime.relative_mode(i,U).length()):
+                    map_.append(0)
+            else:
+                j=self.map[i-1]
+                for k in range(Vprime.relative_mode(j,V).length()):
+                    map_.append(Vprime.sublength(j,V)+k+1)
+        map_ = tuple(map_)
+        print(Uprime)
+        print(Vprime)
+        print(map_)
+        result = Nest_morphism(Uprime,Vprime,map_)
+        return result
+

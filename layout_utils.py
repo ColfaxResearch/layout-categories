@@ -22,6 +22,20 @@ def nullify_trivial_strides(flat_layout: cute.Layout) -> cute.Layout:
     result = cute.make_layout(shape,stride=tuple(new_stride))
     return result 
 
+def nullify_zero_strides(layout: cute.Layout) -> cute.Layout:
+    """
+    Description: 
+    Given a flat layout L = (s_1,...,s_m):(d_1,...,d_m),
+    sets d_i = 0 if s_i = 1.
+    """
+    cute.is_int_tuple
+    flat_layout = nullify_trivial_strides(flatten_layout(layout))
+    shape  = NestedTuple(layout.shape).sub(flat_layout.shape).data
+    stride = NestedTuple(layout.stride).sub(flat_layout.stride).data
+    result = cute.make_layout(shape,stride=stride)
+    return result 
+
+
 def flatten_layout(layout):
     """
     Description: 
@@ -76,48 +90,101 @@ def is_tractable(layout):
 @cute.jit
 def compute_Tuple_morphism(flat_layout):
     """
-    Description: 
+    Description:
     Given a tractable flat layout L, produces a tuple morphism f with L_f = L.
     """
-    if not is_tractable(flat_layout):
+    if cutlass.const_expr(not is_tractable(flat_layout)):
         raise ValueError("The given layout is not tractable.")
     
-    domain  = flat_layout.shape
+    domain = tuple(flat_layout.shape)
     sorted_flat_layout, permutation = sort_flat_layout_with_perm(flat_layout)
-    shape   = sorted_flat_layout.shape
-    stride  = sorted_flat_layout.stride
+    shape = tuple(sorted_flat_layout.shape)
+    stride = tuple(sorted_flat_layout.stride)
     m = len(shape)
 
-    #Find the largest integer k such that stride(L)_k = stride[k-1] = 0
-    k=0
-    while k<m and stride[k]==0:
-        k+=1
+    # Find the largest integer k such that stride(L)_k = stride[k-1] = 0
+    k = 0
+    seen_nonzero = False
+    for i in cutlass.range_constexpr(len(stride)):
+        if cutlass.const_expr(stride[i] == 0 and not seen_nonzero):
+            k += 1
+        else:
+            seen_nonzero = True
 
-    codomain = []
-    if k < m:
-        codomain.append(stride[k])
-        codomain.append(shape[k])
-        for j in range(k+2,m+1):
-            codomain.append(int(stride[j-1]/(shape[j-2]*stride[j-2])))
-            codomain.append(shape[j-1])
-    codomain = tuple(codomain)
+    # build codomain
+    codomain = tuple()
+    if cutlass.const_expr(k < m):
+        cod = [stride[k], shape[k]]
+        for j in cutlass.range_constexpr(k + 1, m):
+            denom = shape[j - 1] * stride[j - 1]
+            # mimic original: integer factorization step; use // for exact integer division
+            factor = (stride[j] // denom) if denom != 0 else 0
+            cod.append(int(factor))
+            cod.append(shape[j])
+        codomain = tuple(cod)
+    else:
+        codomain = tuple()
 
-    #Construct the map alpha'
-    alpha_prime = [] 
-    for _ in range(k):
-        alpha_prime.append(0)
-    for j in range(k+1,m+1):
-        alpha_prime.append(2*(j-k))
+    # construct the map alpha'
+    alpha_prime = [0] * m
+    for j in cutlass.range_constexpr(k, m):
+        alpha_prime[j] = 2 * (j - k + 1)
 
-    #Construct the inverse permutation sigma^{-1}
-    inverse_permutation = [0]*m
-    for i in range(m):
-        inverse_permutation[permutation[i]-1] = i+1
+    # construct the inverse permutation
+    inverse_permutation = [0] * m
+    for i in cutlass.range_constexpr(m):
+        inverse_permutation[permutation[i] - 1] = i + 1
+
+    # alpha = alpha'[σ^{-1}(i)]
+    alpha = tuple(alpha_prime[inverse_permutation[i] - 1] for i in range(m))
+
+    return Tuple_morphism(domain, codomain, alpha)
+
+# @cute.jit
+# def compute_Tuple_morphism(flat_layout):
+#     """
+#     Description: 
+#     Given a tractable flat layout L, produces a tuple morphism f with L_f = L.
+#     """
+#     if cutlass.const_expr(not is_tractable(flat_layout)):
+#         raise ValueError("The given layout is not tractable.")
     
-    #Construct alpha = alpha' o sigma^{-1}
-    alpha = tuple([alpha_prime[inverse_permutation[i]-1] for i in range(m)])
+#     domain  = flat_layout.shape
+#     sorted_flat_layout, permutation = sort_flat_layout_with_perm(flat_layout)
+#     shape   = sorted_flat_layout.shape
+#     stride  = sorted_flat_layout.stride
+#     m = len(shape)
 
-    return Tuple_morphism(domain,codomain,alpha)
+#     #Find the largest integer k such that stride(L)_k = stride[k-1] = 0
+#     k=0
+#     while k<m and stride[k]==0:
+#         k+=1
+
+#     codomain = []
+#     if k < m:
+#         codomain.append(stride[k])
+#         codomain.append(shape[k])
+#         for j in range(k+2,m+1):
+#             codomain.append(int(stride[j-1]/(shape[j-2]*stride[j-2])))
+#             codomain.append(shape[j-1])
+#     codomain = tuple(codomain)
+
+#     #Construct the map alpha'
+#     alpha_prime = [] 
+#     for _ in range(k):
+#         alpha_prime.append(0)
+#     for j in range(k+1,m+1):
+#         alpha_prime.append(2*(j-k))
+
+#     #Construct the inverse permutation sigma^{-1}
+#     inverse_permutation = [0]*m
+#     for i in range(m):
+#         inverse_permutation[permutation[i]-1] = i+1
+    
+#     #Construct alpha = alpha' o sigma^{-1}
+#     alpha = tuple([alpha_prime[inverse_permutation[i]-1] for i in range(m)])
+
+#     return Tuple_morphism(domain,codomain,alpha)
 
 def compute_flat_layout(morphism: Tuple_morphism):
     """
@@ -185,20 +252,39 @@ def compute_layout(morphism: Nest_morphism) -> cute.Layout:
 @cute.jit
 def compute_Nest_morphism(layout):
     """
-    Description: 
+    Description:
     Given a tractable layout L, produces a nested tuple morphism f with L_f = L.
     """
-    if not is_tractable(layout):
+    if cutlass.const_expr(not is_tractable(layout)):
         raise ValueError("The given layout is not tractable.")
-    
-    flat_layout   = flatten_layout(layout)
+
+    flat_layout = flatten_layout(layout)
     flat_morphism = compute_Tuple_morphism(flat_layout)
-    domain        = NestedTuple(layout.shape)
-    codomain      = NestedTuple(flat_morphism.codomain)
-    map           = flat_morphism.map
-    morphism      = Nest_morphism(domain,codomain,map)
+    domain = NestedTuple(layout.shape)
+    codomain = NestedTuple(flat_morphism.codomain)
+    map = flat_morphism.map
+    morphism = Nest_morphism(domain, codomain, map)
 
     return morphism
+
+
+# @cute.jit
+# def compute_Nest_morphism(layout):
+#     """
+#     Description: 
+#     Given a tractable layout L, produces a nested tuple morphism f with L_f = L.
+#     """
+#     if not is_tractable(layout):
+#         raise ValueError("The given layout is not tractable.")
+    
+#     flat_layout   = flatten_layout(layout)
+#     flat_morphism = compute_Tuple_morphism(flat_layout)
+#     domain        = NestedTuple(layout.shape)
+#     codomain      = NestedTuple(flat_morphism.codomain)
+#     map           = flat_morphism.map
+#     morphism      = Nest_morphism(domain,codomain,map)
+
+#     return morphism
 
 def flat_complement(flat_layout, N):
     reduced_layout = sort_flat_layout(flat_layout)
@@ -214,80 +300,19 @@ def flat_complement(flat_layout, N):
         stride.append(S[i] * D[i])
     return cute.make_layout(tuple(shape), stride=tuple(stride))
 
-def depth2_refinement(refinement,input):
-    """"
-    Currently assumes that there exists a nesting on refinement whose depth
-    1 reduction is input
+def mutual_refinement(nestedtuple1,nestedtuple2):
     """
-    breaks = [0]
-    current_product = 1
-    j = 0
-    for i in range(len(refinement)):
-        current_product *= refinement[i]
-        if current_product == input[j]:
-            breaks.append(i+1)
-            j+=1
-            current_product = 1
-    tuples = []
-    for i in range(len(breaks)-1):
-        tuples.append(tuple(refinement[breaks[i]: breaks[i+1]]))
-    for i, entry in enumerate(tuples):
-        if len(entry) == 1:
-            tuples[i] = entry[0]
-    tuples = tuple(tuples)
-    return tuples
-
-def mutual_refinement(tuple1,tuple2):
-    """
-    Given tuples tuple1 = T and tuple2 = U, computes nested tuples 
-    T' and U' whose depth one reductions are T and U, and whose flattenings
-    are equal. For example 
+    Given nested tuples nestedtuple1 = T and nestedtuple2 = U, computes nested tuples 
+    T' and U' such that 
+     1. T' refines T
+     2. U' refines U, and 
+     3. T' divides U'
+    For example 
     T = (6,6)
-    U = (2,6,3)
+    U = (2,6,6)
     ->
     T' = ((2,3),(2,3))
-    U' = (2,(3,2),3)
-    flat(T') = flat(U') = (2,3,2,3)
-    """
-    list1 = list(tuple1)
-    list2 = list(tuple2)
-
-    i = 0
-    j = 0
-    result = []
-    while i < len(list1) and j < len(list2):
-        if list1[i] == list2[j]:
-            result.append(list1[i])
-            i += 1
-            j += 1
-        elif list1[i] < list2[j] and list2[j]%list1[i] == 0:
-            result.append(list1[i])
-            list2[j] //= list1[i]
-            i+=1
-        elif list2[j] < list1[i] and list1[i]%list2[j] == 0:
-            result.append(list2[j])
-            list1[i] //= list2[j]
-            j+=1
-        else:
-            raise ValueError("The tuples are not mutually refinable.")
-    if i< len(list1) or j < len(list2):
-        raise ValueError("The tuples are not mutually refinable.")
-    result = tuple(result)
-    refinedtuple1 = depth2_refinement(result,tuple1)
-    refinedtuple2 = depth2_refinement(result,tuple2)
-    return result, refinedtuple1, refinedtuple2
-
-def composability_algorithm(nestedtuple1,nestedtuple2):
-    """
-    Given tuples tuple1 = T and tuple2 = U, computes nested tuples 
-    T' and U' whose depth one reductions are T and U, and whose flattenings
-    are equal. For example 
-    T = (6,6)
-    U = (2,6,3)
-    ->
-    T' = ((2,3),(2,3))
-    U' = (2,(3,2),3)
-    flat(T') = flat(U') = (2,3,2,3)
+    U' = (2,(3,2),(3,2))
     """
     tuple1 = nestedtuple1.flatten()
     tuple2 = nestedtuple2.flatten()
@@ -340,6 +365,18 @@ def composability_algorithm(nestedtuple1,nestedtuple2):
     result2 = nestedtuple2.sub(tuple(result2))
     return result1, result2
 
+def weak_composite(f:'Nest_morphism',g: 'Nest_morphism'):
+    S = f.domain
+    T = f.codomain
+    U = g.domain
+    V = g.codomain
+    Tprime,Uprime = mutual_refinement(T,U)
+    assert Tprime.refines(T) and Uprime.refines(U)
+    inclusion = Nest_morphism(Tprime,Uprime,tuple(range(1,Tprime.length()+1)))
+    fprime = f.pullback_along(Tprime)
+    gprime = g.pushforward_along(Uprime)
+    weak_composite = fprime.compose(inclusion).compose(gprime)
+    return weak_composite
 
 def main():  
     pass
