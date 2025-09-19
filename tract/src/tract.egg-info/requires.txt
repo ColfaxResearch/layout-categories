@@ -1,0 +1,8 @@
+numpy>=1.20.0
+nvidia-cutlass-dsl>=4.2.0
+
+[dev]
+pytest>=7.0.0
+black>=22.0.0
+isort>=5.10.0
+mypy>=0.950

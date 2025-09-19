@@ -1,0 +1,49 @@
+Metadata-Version: 2.4
+Name: tract
+Version: 0.1.0
+Summary: A Python library for category-theoretic morphisms and CuTe DSL layout computations
+Author-email: Your Name <your.email@example.com>
+License: MIT
+Keywords: category-theory,morphisms,gpu,cuda,cute,layouts
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Mathematics
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.12
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.20.0
+Requires-Dist: nvidia-cutlass-dsl>=4.2.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: black>=22.0.0; extra == "dev"
+Requires-Dist: isort>=5.10.0; extra == "dev"
+Requires-Dist: mypy>=0.950; extra == "dev"
+
+# layout-categories
+
+This respository contains the companion software for the paper "Categorical foundations of NVIDIA CuTe layouts", by Colfax Research.
+
+Project structure:
+```
+layout-categories
+|> categories.py        # Core category-theoretic definitions
+|> layout_utils.py      # CuTe layout manipulation logic
+|> test_utils.py        # Morphism generators and helpers
+|> tests.py             # Unit tests for correctness and agreement
+|> notebook.ipynb       # Interactive notebook for demonstrations
+```
+
+Dependencies can be found in requirements.txt, and installed with 
+```
+pip install -r requirements.txt
+```
+
+Run the tests using pytest:
+```
+pytest tests.py
+```
