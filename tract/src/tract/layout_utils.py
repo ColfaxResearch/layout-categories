@@ -146,7 +146,6 @@ def compute_Tuple_morphism(flat_layout: cute.Layout) -> Tuple_morphism:
     :return: Corresponding tuple morphism
     :rtype: Tuple_morphism
     """
-    morphism = None
 
     if cutlass.const_expr(is_tractable(flat_layout)):
         domain = tuple(flat_layout.shape)
@@ -191,7 +190,9 @@ def compute_Tuple_morphism(flat_layout: cute.Layout) -> Tuple_morphism:
         
         morphism = Tuple_morphism(domain, codomain, alpha)
 
-    return morphism
+        return morphism
+    else:
+        raise ValueError("The provided layout is not tractable.")
 
 
 def compute_flat_layout(morphism: Tuple_morphism) -> cute.Layout:
@@ -298,15 +299,11 @@ def compute_Nest_morphism(layout: cute.Layout) -> Nest_morphism:
     """
     flat_layout = flatten_layout(layout)
     flat_morphism = compute_Tuple_morphism(flat_layout)
-    
-    if cutlass.const_expr(flat_morphism is not None):
-        domain = NestedTuple(layout.shape)
-        codomain = NestedTuple(flat_morphism.codomain)
-        map = flat_morphism.map
-        morphism = Nest_morphism(domain, codomain, map)
-    else:
-        morphism = None
 
+    domain = NestedTuple(layout.shape)
+    codomain = NestedTuple(flat_morphism.codomain)
+    map = flat_morphism.map
+    morphism = Nest_morphism(domain, codomain, map)
     return morphism
 
 
