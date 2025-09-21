@@ -1,6 +1,6 @@
 # layout-categories
 
-This respository contains the companion software for the paper "Categorical foundations of NVIDIA CuTe layouts", by Colfax Research.
+This respository contains the companion software for the paper "Categorical Foundations for CuTe Layouts", by Colfax Research.
 
 Project structure:
 ```
