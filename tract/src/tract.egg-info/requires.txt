@@ -1,0 +1,5 @@
+nvidia-cutlass-dsl>=4.2.0
+numpy>=1.23.0
+
+[dev]
+pytest>=7.0.0
