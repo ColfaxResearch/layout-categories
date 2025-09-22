@@ -1,8 +1,8 @@
 # layout-categories
 
-This respository contains the companion software for the paper "Categorical Foundations of CuTe layouts", by Colfax Research. The paper and our accompanying blog post can be found [on our website](https://research.colfax-intl.com/categorical-foundations-for-cute-layouts/). 
+This respository contains the companion software for the paper "Categorical Foundations for CuTe layouts", by Colfax Research. The paper and our accompanying blog post can be found [on our website](https://research.colfax-intl.com/categorical-foundations-for-cute-layouts/). 
 
-In the paper, we develop a robust algebra of morphisms in the categories $Tuple$ and $Nest$, which encode flat layous and layouts, respectively. Here, we implement this algebra and demonstrate empirically that the operations align with their counterparts in CuTe, using CuTe DSL. 
+In the paper, we develop a robust algebra of morphisms in the categories $\text{Tuple}$ and $\text{Nest}$, which encode flat layous and layouts, respectively. Here, we implement this algebra and demonstrate empirically that the operations align with their counterparts in CuTe, using CuTe DSL. 
 
 Project structure:
 ```
