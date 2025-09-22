@@ -1,8 +1,8 @@
 """
-Comprehensive test suite for Tract morphisms and layouts.
+Comprehensive test suite for code accompanying "Categorical Foundations for CuTe layouts" by Colfax Research.
 
 Tests the mathematical properties and implementations of morphisms
-in categories E_0, Tuple, and NestTuple, along with their associated
+in categories E_0, Tuple, and Nest, along with their associated
 layout computations.
 """
 
@@ -29,6 +29,8 @@ from tract.test_utils import (
     random_complementable_Nest_morphism,
     random_Nest_morphisms_with_disjoint_images,
     random_composable_Nest_morphisms,
+    random_product_admissible_Nest_morphisms,
+    random_divisible_Nest_morphisms,
     random_mutually_refinable_nested_tuples,
     random_Nest_morphism,
 )
@@ -361,6 +363,27 @@ def Nest_compose_agree(
 
 
 @cute.jit
+def Nest_logical_product_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]):
+    layout_f = compute_layout(f)
+    layout_g = compute_layout(g)
+    product = f.logical_product(g)
+    product_layout = nullify_zero_strides(cute.logical_product(layout_f,layout_g))
+    layout_product = nullify_zero_strides(compute_layout(product))
+    return layout_product == product_layout
+
+
+@cute.jit
+def Nest_logical_divide_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]):
+    morphism_quotient = f.logical_divide(g)
+    layout_quotient = nullify_zero_strides(compute_layout(morphism_quotient))
+
+    layout_f = compute_layout(f)
+    layout_g = compute_layout(g)
+    layout_g_complement = cute.complement(layout_g,cute.size(layout_f))
+    quotient_layout = cute.composition(layout_f,concatenate(layout_g,layout_g_complement))
+    return cute.coalesce(layout_quotient)==cute.coalesce(quotient_layout)
+
+@cute.jit
 def composition_algorithm_agree(
     f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]
 ) -> bool:
@@ -422,6 +445,18 @@ class TestNestMorphism:
             assert Nest_concat_agree(f, g)
         except OverflowError as e:
             pytest.skip(f"Skipped due to cosize overflow: {e}")
+
+    @pytest.mark.parametrize("iteration", iterations)
+    def test_Nest_logical_product_agree(self,iteration):
+        np.random.seed(RANDOM_SEED_BASE + iteration)
+        f,g = random_product_admissible_Nest_morphisms()
+        assert Nest_logical_product_agree(f,g)
+
+    @pytest.mark.parametrize("iteration", iterations)
+    def test_Nest_logical_divide_agree(self,iteration):
+        np.random.seed(RANDOM_SEED_BASE + iteration)
+        f,g = random_divisible_Nest_morphisms()
+        assert Nest_logical_divide_agree(f,g)
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_Nest_compose_agree(self, iteration):
@@ -500,11 +535,12 @@ class TestMorphismProperties:
         f = random_complementable_Tuple_morphism(max_length=6, max_value=10)
         f_comp = f.complement()
         f_comp_comp = f_comp.complement()
+        sorted_f = f.sort()
         
         # Complement of complement should give back original
-        assert f.domain == f_comp_comp.domain
-        assert f.codomain == f_comp_comp.codomain
-        assert set(f.map) == set(f_comp_comp.map)
+        assert sorted_f.domain == f_comp_comp.domain
+        assert sorted_f.codomain == f_comp_comp.codomain
+        assert set(sorted_f.map) == set(f_comp_comp.map)
 
 
 # *************************************************************************
