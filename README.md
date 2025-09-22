@@ -1,23 +1,36 @@
 # layout-categories
 
-This respository contains the companion software for the paper "Categorical Foundations for CuTe Layouts", by Colfax Research.
+This respository contains the companion software for the paper "Categorical Foundations of CuTe layouts", by Colfax Research. The paper and our accompanying blog post can be found [on our website](https://research.colfax-intl.com/categorical-foundations-for-cute-layouts/). 
+
+In the paper, we develop a robust algebra of morphisms in the categories $Tuple$ and $Nest$, which encode flat layous and layouts, respectively. Here, we implement this algebra and demonstrate empirically that the operations align with their counterparts in CuTe, using CuTe DSL. 
 
 Project structure:
 ```
-layout-categories
-|> categories.py        # Core category-theoretic definitions
-|> layout_utils.py      # CuTe layout manipulation logic
-|> test_utils.py        # Morphism generators and helpers
-|> tests.py             # Unit tests for correctness and agreement
-|> notebook.ipynb       # Interactive notebook for demonstrations
+tract/
+├── pyproject.toml
+├── README.md
+├── examples/
+│   └── example_notebook.ipynb
+├── src/
+│   └── tract/
+│       ├── __init__.py
+│       ├── categories.py
+│       ├── layout_utils.py
+│       ├── test_utils.py
+│       └── tuple_morph_tikz.py
+└── tests/
+    ├── __init__.py
+    └── morphism_tests.py
 ```
 
-Dependencies can be found in requirements.txt, and installed with 
+To install `tract`, run the following:
 ```
-pip install -r requirements.txt
+cd tract
+pip install .
 ```
 
 Run the tests using pytest:
 ```
-pytest tests.py
+pytest tests/morphism_tests.py
 ```
+
