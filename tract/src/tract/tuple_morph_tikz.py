@@ -1,5 +1,25 @@
-from torch import nested
-from tract import Tuple_morphism, NestedTuple, Nest_morphism
+from tract import Tuple_morphism, NestedTuple, Nest_morphism, make_morphism
+
+PREAMBLE = """
+\\documentclass{standalone}
+\\usepackage{tikz}
+\\usetikzlibrary{arrows.meta, positioning}
+
+\\newcommand{\\mapArrow}[2]{\\draw[maparrow] (#1.east) -- (#2.west);}
+
+\\begin{document}
+\\begin{tikzpicture}[
+    entry/.style={minimum width=5mm, minimum height=7mm, inner sep = 2pt},
+    maparrow/.style={|->}
+]
+\\def\\colspacing{3}
+\\def\\rowspacing{0.8}
+"""
+
+EPILOGUE = """
+\\end{tikzpicture}
+\\end{document}
+"""
 
 def single_mode_nested_tuple_to_tree(tup: NestedTuple) -> str:
     breakpoint()
@@ -48,14 +68,14 @@ def generate_trees(tup: NestedTuple, start_coord: float) -> str:
         mode = tup.mode(mode_idx)
         junctions = []
         
-        # Get max depth for this mode to calculate spacing
-        max_depth = mode.depth()
+        # Calculate actual number of junction layers needed for this mode
+        max_junction_layers = calculate_junction_layers(mode)
         
-        mode_nodes = process_mode(mode, offset, start_coord + 3, junctions, start_coord, junction_counter, 1, max_depth)
+        mode_nodes = process_mode(mode, offset, start_coord + 3, junctions, start_coord, junction_counter, 1, max_junction_layers)
         
         # Output junction coordinates for this mode
         for junction in junctions:
-            ret += f"\\coordinate (j{junction['id']}) at ({junction['x']:.1f}, {junction['y']:.2f});\n"
+            ret += f"\\coordinate (j{junction['id']}) at ({junction['x']:.2f}, {junction['y']:.2f});\n"
         
         # Connect final nodes to mode root
         root_name = f"m{mode_idx}"
@@ -72,7 +92,7 @@ def generate_trees(tup: NestedTuple, start_coord: float) -> str:
     return ret
 
 def process_mode(mode, base_offset: int, leaf_x: float, junctions: list, root_x: float, 
-                junction_counter: list, depth: int, max_depth: int) -> list:
+                junction_counter: list, depth: int, max_junction_layers: int) -> list:
     """Recursively process a mode and return connection points"""
     
     # If mode is a single integer
@@ -83,12 +103,9 @@ def process_mode(mode, base_offset: int, leaf_x: float, junctions: list, root_x:
     junction_id = junction_counter[0]
     junction_counter[0] += 1
     
-    # Calculate x position with proportional spacing
-    # For n levels, distribute junctions evenly between columns
-    # Column 1 is at x=0, column 2 is at x=3
-    # We want junctions at 3/(n+1), 2*3/(n+1), etc.
-    spacing = 3.0  # Distance between columns
-    junction_x = spacing * depth / (max_depth + 2)
+    # Calculate x position with equal spacing between root and leaf columns
+    spacing = leaf_x - root_x
+    junction_x = root_x + spacing * depth / (max_junction_layers + 1)
     
     # Process sub-modes to get connections and leaf indices
     connections = []
@@ -106,7 +123,7 @@ def process_mode(mode, base_offset: int, leaf_x: float, junctions: list, root_x:
             # Nested structure - recurse with incremented depth
             sub_junctions = []
             sub_connections = process_mode(sub_mode, sub_offset, leaf_x, sub_junctions, 
-                                         root_x, junction_counter, depth + 1, max_depth)
+                                         root_x, junction_counter, depth + 1, max_junction_layers)
             
             # Add sub-junctions to our list
             junctions.extend(sub_junctions)
@@ -135,6 +152,21 @@ def process_mode(mode, base_offset: int, leaf_x: float, junctions: list, root_x:
     
     return [f"j{junction_id}"]
 
+def calculate_junction_layers(mode) -> int:
+    """Calculate the number of junction layers needed for a mode"""
+    if isinstance(mode.data, int):
+        return 0
+    
+    # This mode will create one junction, plus any sub-junctions
+    max_sub_layers = 0
+    for i in range(1, mode.rank() + 1):
+        sub_mode = mode.mode(i)
+        if not isinstance(sub_mode.data, int):
+            sub_layers = calculate_junction_layers(sub_mode)
+            max_sub_layers = max(max_sub_layers, sub_layers)
+    
+    return 1 + max_sub_layers
+
 def get_leaf_indices(mode, base_offset: int) -> list:
     """Get all leaf indices for a mode"""
     # Check if mode is just an integer
@@ -158,13 +190,14 @@ def get_leaf_indices(mode, base_offset: int) -> list:
     
     return indices
 
-def nested_tuple_morphism_to_tikz(morphism: Tuple_morphism, profile: NestedTuple) -> str:
-    assert morphism.domain == profile.flatten()
+def nested_tuple_morphism_to_tikz(morphism: Nest_morphism) -> str:
+    domain = morphism.domain
+    flat_morphism = morphism.flatten()
     ret = ""
-    ret += nested_tuple_to_tikz(profile, start_coord=0)
+    ret += nested_tuple_to_tikz(domain, start_coord=0)
     ret += "\n"
-    ret += tuple_morphism_to_tikz(morphism, start_coord=3)
-    return ret
+    ret += tuple_morphism_to_tikz(flat_morphism, start_coord=3)
+    return PREAMBLE + ret + EPILOGUE
 
 def tuple_morphism_to_tikz(morphism: Tuple_morphism, start_coord = 0)-> str:
     domain = morphism.domain
@@ -185,11 +218,8 @@ def tuple_morphism_to_tikz(morphism: Tuple_morphism, start_coord = 0)-> str:
     return ret
 
 if __name__ == "__main__":
-    m = Tuple_morphism((6, 2, 3, 6, 3, 2), (6, 2, 6, 3, 2, 3), (1, 2, 4, 3, 6, 5))
-    n = NestedTuple(((6, 2, 3), (6, 2)))
-    profile_m = NestedTuple((6, (2, (3, (6, (3, 2))))))
-    k = NestedTuple((((6, 2))))
+    m = Nest_morphism(domain=(16,(4,4),(4,4)), codomain=(16,4,4), map=(1,2,0,3,0))
     # print(tuple_morphism_to_tikz(m))
     # print(nested_tuple_to_tikz(n))
-    print(nested_tuple_morphism_to_tikz(m, profile_m))
+    print(nested_tuple_morphism_to_tikz(m))
     # print(single_mode_nested_tuple_to_tree(k))

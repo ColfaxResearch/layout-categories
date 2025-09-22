@@ -542,7 +542,6 @@ class NestedTuple:
             result += self.relative_mode(j, refined).length()
         return result
 
-
 # *************************************************************************
 # THE CATEGORY Tuple
 # *************************************************************************
@@ -1577,7 +1576,15 @@ class Nest_morphism:
         map_ = tuple(map_)
         return Nest_morphism(Uprime, Vprime, map_)
 
-
+    def to_tikz(self) -> str:
+        """
+        Generate TikZ representation of the morphism.
+        
+        :return: TikZ code
+        :rtype: str
+        """
+        from tract.tuple_morph_tikz import nested_tuple_morphism_to_tikz
+        return nested_tuple_morphism_to_tikz(self)
 
 def make_morphism(domain, codomain, map, name="") -> Nest_morphism:
     """
