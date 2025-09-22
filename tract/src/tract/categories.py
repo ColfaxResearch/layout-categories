@@ -5,8 +5,6 @@ This module implements morphisms in categories E_0, Tuple, and NestTuple,
 providing the mathematical foundation for GPU kernel layout computations.
 """
 
-import random
-import numpy as np
 from typing import Tuple, Optional
 
 try:
@@ -328,6 +326,25 @@ class NestedTuple:
             raise IndexError(f"Mode index {i} out of range.")
 
         return NestedTuple(self.data[i - 1])
+    
+    def depth(self) -> int:
+        """
+        Maximum depth of nesting in the nested tuple.
+        An integer has depth 1, a flat tuple has depth 1,
+        a nested tuple has depth 1 + max depth of its modes.
+        
+        :return: Maximum nesting depth
+        :rtype: int
+        """
+        if isinstance(self.data, int):
+            return 0
+        
+        max_depth = 1
+        for i in range(1, self.rank() + 1):
+            mode_depth = self.mode(i).depth()
+            max_depth = max(max_depth, mode_depth)
+        
+        return max_depth
 
     def sub(self, values: tuple) -> "NestedTuple":
         """
@@ -1241,10 +1258,10 @@ class Nest_morphism:
     """
 
     def __init__(
-        self, domain: NestedTuple, codomain: NestedTuple, map: tuple, name: str = ""
+        self, domain: NestedTuple | Tuple[int] | int, codomain: NestedTuple | Tuple[int] | int, map: tuple, name: str = ""
     ):
-        self.domain = domain
-        self.codomain = codomain
+        self.domain = domain if isinstance(domain, NestedTuple) else NestedTuple(domain)
+        self.codomain = codomain if isinstance(codomain, NestedTuple) else NestedTuple(codomain)
         self.map = map
         self.name = name
         self.underlying_map = Fin_morphism(
@@ -1578,3 +1595,18 @@ def make_morphism(domain, codomain, map, name="") -> Nest_morphism:
     :rtype: Nest_morphism
     """
     return Nest_morphism(NestedTuple(domain), NestedTuple(codomain), map, name)
+
+def compose(f: Nest_morphism, g: Nest_morphism) -> Nest_morphism:
+    return f.compose(g)
+
+def coalesce(f: Nest_morphism) -> Nest_morphism:
+    return f.coalesce()
+
+def complement(f: Nest_morphism) -> Nest_morphism:
+    return f.complement()
+
+def logical_divide(f: Nest_morphism, g: Nest_morphism) -> Nest_morphism:
+    return f.logical_divide(g)
+
+def logical_product(f: Nest_morphism, g: Nest_morphism) -> Nest_morphism:
+    return f.logical_product(g)
