@@ -10,6 +10,8 @@ tract/
 ├── pyproject.toml
 ├── README.md
 ├── examples/
+|   ├── images/
+|   |   └── nest_morphism_to_tikz_example.png
 │   └── example_notebook.ipynb
 ├── src/
 │   └── tract/
