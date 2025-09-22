@@ -139,7 +139,7 @@ def compute_Tuple_morphism(flat_layout: cute.Layout) -> Tuple_morphism:
     """
     Compute a tuple morphism from a tractable flat layout.
     
-    Given a tractable flat layout L, produces a tuple morphism f with L_f = L.
+    Given a tractable flat layout L, produces the standard representation f_L of L.
     
     :param flat_layout: Input tractable flat layout
     :type flat_layout: cute.Layout
@@ -189,8 +189,14 @@ def compute_Tuple_morphism(flat_layout: cute.Layout) -> Tuple_morphism:
         alpha = tuple(alpha_prime[inverse_permutation[i] - 1] for i in range(m))
         
         morphism = Tuple_morphism(domain, codomain, alpha)
+        restricted_codomain_indices=[]
+        for i in cutlass.range_constexpr(len(codomain)):
+            if cutlass.const_expr(codomain[i] != 1 or i+1 in morphism.map):
+                restricted_codomain_indices.append(i+1)
+        restricted_codomain_indices = tuple(restricted_codomain_indices)
+        result = morphism.factorize(restricted_codomain_indices)
 
-        return morphism
+        return result
     else:
         raise ValueError("The provided layout is not tractable.")
 

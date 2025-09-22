@@ -1390,6 +1390,16 @@ class Nest_morphism:
             self.underlying_map.wedge(g.underlying_map).map,
         )
 
+    def coalesce(self) -> "Nest_morphism":
+        """
+        Compute coalescence of the morphism.
+
+        :return: Coalesced morphism
+        :rtype: Nest_morphism
+        """
+        
+        return self.flatten().coalesce().to_Nest_morphism()
+        
     def is_complementable(self) -> bool:
         """
         Check if nested tuple morphism is complementable.
@@ -1481,7 +1491,7 @@ class Nest_morphism:
         :rtype: Nest_morphism
         """
         other_bar = other.flatten_codomain()
-        return self.concat(other_bar.compose(self.complement()))
+        return self.concat(other.compose(self.complement()))
 
     def pullback_along(self, refinement: NestedTuple) -> "Nest_morphism":
         """
@@ -1549,3 +1559,22 @@ class Nest_morphism:
                     
         map_ = tuple(map_)
         return Nest_morphism(Uprime, Vprime, map_)
+
+
+
+def make_morphism(domain, codomain, map, name="") -> Nest_morphism:
+    """
+    Create a Nest_morphism.
+    
+    :param domain: Domain nested tuple data
+    :type domain: tuple
+    :param codomain: Codomain nested tuple data
+    :type codomain: tuple
+    :param map: Underlying map
+    :type map: tuple
+    :param name: Optional name
+    :type name: str
+    :return: The created morphism
+    :rtype: Nest_morphism
+    """
+    return Nest_morphism(NestedTuple(domain), NestedTuple(codomain), map, name)
