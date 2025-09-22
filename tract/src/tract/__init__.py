@@ -5,8 +5,7 @@
 """
 Tract: Categorical implementations of tractable CuTe layouts
 
-A Python library implementing morphisms in categories E_0, Tuple, and NestTuple,
-with associated layout computations for NVIDIA CuTe DSL integration, accompanying Colfax Research's work "Categorical Foundations for CuTe Layouts".
+A Python library accompanying Colfax Research's work "Categorical Foundations for CuTe Layouts".
 
 Examples
 --------
@@ -18,7 +17,7 @@ Basic usage::
     f = Tuple_morphism(
         domain=(4, 8, 2),
         codomain=(8, 2),
-        map=(1, 0, 2)
+        map=(0, 1, 2)
     )
     
     # Compute associated layout
@@ -27,9 +26,8 @@ Basic usage::
 For more examples, see the examples/ directory.
 """
 
-# __version__ = "0.1.0"
-# __author__ = "Your Name"
-# __email__ = "your.email@example.com"
+__version__ = "0.1.0"
+__author__ = "Colfax Research"
 
 # Core morphism classes
 from .categories import (
@@ -37,6 +35,12 @@ from .categories import (
     Tuple_morphism,
     Nest_morphism,
     NestedTuple,
+    make_morphism,
+    compose,
+    complement,
+    coalesce,
+    logical_divide,
+    logical_product,
 )
 
 # Layout computation functions
@@ -45,6 +49,7 @@ from .layout_utils import (
     compute_layout,
     compute_Tuple_morphism,
     compute_Nest_morphism,
+    compute_morphism,
     flatten_layout,
     sort_flat_layout,
     sort_flat_layout_with_perm,
@@ -82,21 +87,27 @@ from .test_utils import (
 
 __all__ = [
     # Version info
-    # "__version__",
-    # "__author__",
-    # "__email__",
-    
+    "__version__",
+    "__author__",
+
     # Core morphism classes
     "Fin_morphism",
     "Tuple_morphism", 
     "Nest_morphism",
     "NestedTuple",
+    "make_morphism",
+    "compose",
+    "complement",
+    "coalesce",
+    "logical_divide",
+    "logical_product",
     
     # Layout computation functions
     "compute_flat_layout",
     "compute_layout",
     "compute_Tuple_morphism",
     "compute_Nest_morphism",
+    "compute_morphism",
     "flatten_layout",
     "sort_flat_layout",
     "sort_flat_layout_with_perm",

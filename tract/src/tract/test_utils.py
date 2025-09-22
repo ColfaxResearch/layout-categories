@@ -6,7 +6,6 @@ used for property-based testing and validation.
 """
 
 import random
-import torch
 from math import prod
 import numpy as np
 

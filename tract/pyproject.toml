@@ -1,58 +1,31 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "tract"
 version = "0.1.0"
-description = "A Python library for category-theoretic morphisms and CuTe DSL layout computations"
+description = "A Python library for category-theoretic foundations of CuTe layouts"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
-authors = [
-    {name = "Your Name", email = "your.email@example.com"}
-]
 keywords = ["category-theory", "morphisms", "gpu", "cuda", "cute", "layouts"]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Science/Research",
-    "Topic :: Scientific/Engineering :: Mathematics",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-]
-
 dependencies = [
-    "numpy>=1.20.0",
     "nvidia-cutlass-dsl>=4.2.0",
+    "numpy>=1.23.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
-    "black>=22.0.0",
-    "isort>=5.10.0",
-    "mypy>=0.950",
 ]
 
-# [project.urls]
-# "Homepage" = "https://github.com/yourusername/tract"
-# "Bug Reports" = "https://github.com/yourusername/tract/issues"
-# "Source" = "https://github.com/yourusername/tract"
+[project.urls]
+"Homepage" = "https://research.colfax-intl.com/categorical-foundations-for-cute-layouts/"
+"Bug Reports" = "https://github.com/ColfaxResearch/layout-categories/issues"
+"Source" = "https://github.com/ColfaxResearch/layout-categories"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.black]
-line-length = 88
-target-version = ['py38', 'py39', 'py310', 'py311']
-
-[tool.isort]
-profile = "black"
-line_length = 88

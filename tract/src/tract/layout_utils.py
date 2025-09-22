@@ -312,6 +312,7 @@ def compute_Nest_morphism(layout: cute.Layout) -> Nest_morphism:
     morphism = Nest_morphism(domain, codomain, map)
     return morphism
 
+compute_morphism = compute_Nest_morphism
 
 def flat_complement(flat_layout: cute.Layout, N: int) -> cute.Layout:
     """
