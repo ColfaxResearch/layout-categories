@@ -1477,9 +1477,7 @@ class Nest_morphism:
         :return: Quotient
         :rtype: Nest_morphism
         """
-        self_bar = self.flatten().to_Nest_morphism()
-        other_bar = other.flatten_codomain()
-        return other_bar.concat(other_bar.complement()).compose(self_bar)
+        return other.concat(other.complement()).compose(self)
 
     def logical_product(self, other: "Nest_morphism") -> "Nest_morphism":
         """
@@ -1490,7 +1488,6 @@ class Nest_morphism:
         :return: Product
         :rtype: Nest_morphism
         """
-        other_bar = other.flatten_codomain()
         return self.concat(other.compose(self.complement()))
 
     def pullback_along(self, refinement: NestedTuple) -> "Nest_morphism":
