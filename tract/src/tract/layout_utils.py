@@ -315,7 +315,7 @@ def compute_Nest_morphism(layout: cute.Layout) -> Nest_morphism:
 
 compute_morphism = compute_Nest_morphism
 
-def to_tikz_picture(layout: cute.Layout, full_doc=False) -> str:
+def layout_to_tikz(layout: cute.Layout, full_doc=False) -> str:
     morphism = compute_Nest_morphism(layout)
     layout_str = str(layout)
     tikz_str = nested_tuple_morphism_to_tikz(

@@ -3,6 +3,7 @@ from tract import Tuple_morphism, NestedTuple, Nest_morphism, make_morphism
 PREAMBLE = r"""
 \documentclass{standalone}
 \usepackage{tikz}
+\usepackage{amsmath}
 \usetikzlibrary{arrows.meta, positioning}
 \newcommand{\mapArrow}[2]{\draw[maparrow] (#1.east) -- (#2.west);}
 \begin{document}
