@@ -339,12 +339,12 @@ class NestedTuple:
         if isinstance(self.data, int):
             return 0
         
-        max_depth = 1
+        max_depth = 0
         for i in range(1, self.rank() + 1):
             mode_depth = self.mode(i).depth()
             max_depth = max(max_depth, mode_depth)
         
-        return max_depth
+        return max_depth + 1
 
     def sub(self, values: tuple) -> "NestedTuple":
         """
@@ -1299,6 +1299,10 @@ class Nest_morphism:
 
     def __str__(self):
         return f"{self.domain} --{self.map}--> {self.codomain}"
+    
+    def repr_in_tex(self) -> str:
+        map_str = '(' + ','.join(str(i) if i != 0 else '*' for i in self.map) + ')'
+        return f"${self.domain} \\xrightarrow{{{map_str}}} {self.codomain}$"
 
     def flatten(self) -> Tuple_morphism:
         """
@@ -1573,15 +1577,24 @@ class Nest_morphism:
         map_ = tuple(map_)
         return Nest_morphism(Uprime, Vprime, map_)
 
-    def to_tikz(self) -> str:
+    def to_tikz(self, full_doc=False) -> str:
         """
         Generate TikZ representation of the morphism.
-        
+
         :return: TikZ code
         :rtype: str
         """
         from tract.tuple_morph_tikz import nested_tuple_morphism_to_tikz
-        return nested_tuple_morphism_to_tikz(self)
+
+        return nested_tuple_morphism_to_tikz(
+            self,
+            row_spacing=0.8,
+            tree_width=2.2,
+            map_width=3.0,
+            root_y_offset=0.0,
+            label=f"{self.repr_in_tex()}",
+            full_doc=full_doc,
+        )
 
 def make_morphism(domain, codomain, map, name="") -> Nest_morphism:
     """
@@ -1614,3 +1627,6 @@ def logical_divide(f: Nest_morphism, g: Nest_morphism) -> Nest_morphism:
 
 def logical_product(f: Nest_morphism, g: Nest_morphism) -> Nest_morphism:
     return f.logical_product(g)
+
+def morphism_to_tikz(f: Nest_morphism, full_doc=False) -> str:
+    return f.to_tikz(full_doc=full_doc)
