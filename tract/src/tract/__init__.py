@@ -41,6 +41,7 @@ from .categories import (
     coalesce,
     logical_divide,
     logical_product,
+    morphism_to_tikz,
 )
 
 # Layout computation functions
@@ -61,6 +62,8 @@ from .layout_utils import (
     mutual_refinement,
     weak_composite,
     flat_complement,
+    layout_to_tikz,
+    mutual_refinement_to_tikz,
 )
 
 from .test_utils import (
@@ -101,6 +104,7 @@ __all__ = [
     "coalesce",
     "logical_divide",
     "logical_product",
+    "morphism_to_tikz",
     
     # Layout computation functions
     "compute_flat_layout",
@@ -119,6 +123,8 @@ __all__ = [
     "mutual_refinement",
     "weak_composite",
     "flat_complement",
+    "layout_to_tikz",
+    "mutual_refinement_to_tikz",
     
     # Test utilities
     "random_Fin_morphism",
