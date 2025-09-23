@@ -11,6 +11,8 @@ tract/
 ├── README.md
 ├── examples/
 |   ├── images/
+|   |   ├── layout_to_tikz_example.png
+|   |   ├── mutual_refinement_to_tikz_example.png
 |   |   └── nest_morphism_to_tikz_example.png
 │   └── example_notebook.ipynb
 ├── src/
