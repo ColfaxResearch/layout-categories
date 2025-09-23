@@ -61,6 +61,8 @@ from .layout_utils import (
     mutual_refinement,
     weak_composite,
     flat_complement,
+    to_tikz_picture,
+    mutual_refinement_to_tikz,
 )
 
 from .test_utils import (
@@ -119,6 +121,8 @@ __all__ = [
     "mutual_refinement",
     "weak_composite",
     "flat_complement",
+    "to_tikz_picture",
+    "mutual_refinement_to_tikz",
     
     # Test utilities
     "random_Fin_morphism",
