@@ -1415,7 +1415,9 @@ class Nest_morphism:
         """
         flat_coalesce = self.flatten().coalesce().to_Nest_morphism()
 
-        if flat_coalesce.domain.length() == 0:
+        if self.domain.length() == 0:
+            result = self.flatten().to_Nest_morphism()
+        elif flat_coalesce.domain.length() == 0:
             modification = Nest_morphism(1, (), (0,))
             result = modification.compose(flat_coalesce)
         elif flat_coalesce.domain.length() == 1:
