@@ -55,7 +55,6 @@ RANDOM_SEED_BASE = 42
 # TUPLE_MORPHISM TEST COMPONENTS
 # *************************************************************************
 
-
 @cute.jit
 def coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]) -> bool:
     """
@@ -87,7 +86,6 @@ def coalesce_agree(f: cutlass.Constexpr[Tuple_morphism]) -> bool:
     )
     return agree
 
-
 @cute.jit
 def concat_agree(
     f: cutlass.Constexpr[Tuple_morphism], g: cutlass.Constexpr[Tuple_morphism]
@@ -108,7 +106,6 @@ def concat_agree(
     layout_concat = compute_flat_layout(concat_morphs)
     concat_layout = flat_concatenate(layout_f, layout_g)
     return layout_concat == concat_layout
-
 
 @cute.jit
 def compose_agree(
@@ -131,7 +128,6 @@ def compose_agree(
     compose_layout = cute.composition(layout_g, layout_f)
     return layout_compose == compose_layout
 
-
 @cute.jit
 def complement_agree(f: cutlass.Constexpr[Tuple_morphism]) -> bool:
     """
@@ -147,7 +143,6 @@ def complement_agree(f: cutlass.Constexpr[Tuple_morphism]) -> bool:
     layout_f_complement = compute_flat_layout(f_complement)
     complement_layout_f = cute.complement(layout_f, f.cosize())
     return cute.coalesce(complement_layout_f) == cute.coalesce(layout_f_complement)
-
 
 @cute.jit
 def flat_divide_agree(
@@ -169,7 +164,6 @@ def flat_divide_agree(
     quotient_layout = flatten_layout(cute.logical_divide(layout_f, layout_g))
     layout_quotient = compute_flat_layout(quotient)
     return cute.coalesce(layout_quotient) == cute.coalesce(quotient_layout)
-
 
 @cute.jit
 def flat_product_agree(
@@ -317,7 +311,6 @@ class TestTupleMorphism:
 # NEST_MORPHISM TEST COMPONENTS
 # *************************************************************************
 
-
 @cute.jit
 def Nest_concat_agree(
     f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]
@@ -339,6 +332,21 @@ def Nest_concat_agree(
     concat_layout = concatenate(layout_f, layout_g)
     return layout_concat == concat_layout
 
+@cute.jit
+def Nest_complement_agree(f: cutlass.Constexpr[Nest_morphism]) -> bool:
+    """
+    Check if nested tuple morphism complement agrees with layout complement.
+    
+    :param f: Morphism to test
+    :type f: Nest_morphism
+    :return: True if complements agree
+    :rtype: bool
+    """
+    f_complement = f.complement()
+    layout_f = compute_layout(f)
+    layout_f_complement = compute_layout(f_complement)
+    complement_layout_f = cute.complement(layout_f, f.cosize())
+    return complement_layout_f == cute.coalesce(layout_f_complement)
 
 @cute.jit
 def Nest_compose_agree(
@@ -375,8 +383,14 @@ def Nest_coalesce_agree(f: cutlass.Constexpr[Nest_morphism]) -> bool:
     layout_f = compute_layout(f)
     coalesce_layout = compute_layout(coalesce_f)
     layout_coalesce = cute.coalesce(layout_f)
-    return coalesce_layout == layout_coalesce
-
+    agree = (
+        (coalesce_layout == layout_coalesce)
+        or (
+            cute.rank(layout_coalesce) == 0
+            and coalesce_layout == cute.make_layout(1, stride=0)
+        )
+    )
+    return agree
 
 @cute.jit
 def Nest_logical_product_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]):
@@ -386,7 +400,6 @@ def Nest_logical_product_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.C
     product_layout = cute.logical_product(layout_f, layout_g)
     layout_product = compute_layout(product)
     return layout_product == product_layout
-
 
 @cute.jit
 def Nest_logical_divide_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]):
@@ -445,6 +458,18 @@ class TestNestMorphism:
         np.random.seed(RANDOM_SEED_BASE + iteration)
         f = random_complementable_Nest_morphism()
         assert f.is_complementary_to(f.complement())
+
+    @pytest.mark.parametrize("iteration", iterations)
+    def test_Nest_complement_agree(self, iteration):
+        """
+        Test that nested tuple morphism complement agrees with layout complement.
+        
+        :param iteration: Test iteration number for seeding
+        :type iteration: int
+        """
+        np.random.seed(RANDOM_SEED_BASE + iteration)
+        f = random_complementable_Nest_morphism(max_value=10)
+        assert Nest_complement_agree(f)
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_Nest_concat_agree(self, iteration):
@@ -548,7 +573,7 @@ class TestMorphismProperties:
         # Test that composing with identity gives same morphism
         f = random_Tuple_morphism(codomain=domain, max_length=8, max_value=10)
         assert f.compose(identity).map == f.map
-    
+        
     def test_complement_involution(self):
         """Test that complement is an involution, up to sorting."""
         np.random.seed(RANDOM_SEED_BASE)
