@@ -127,7 +127,7 @@ def compose_agree(
     layout_f = compute_flat_layout(f)
     layout_g = compute_flat_layout(g)
     compose_morphs = f.compose(g)
-    layout_compose = nullify_trivial_strides(compute_flat_layout(compose_morphs))
+    layout_compose = compute_flat_layout(compose_morphs)
     compose_layout = cute.composition(layout_g, layout_f)
     return layout_compose == compose_layout
 
@@ -190,7 +190,7 @@ def flat_product_agree(
     B = compute_flat_layout(g)
     C = compute_flat_layout(k)
     product = flatten_layout(cute.logical_product(A, B))
-    return nullify_trivial_strides(C) == nullify_trivial_strides(product)
+    return C == product
 
 
 # *************************************************************************
@@ -357,9 +357,25 @@ def Nest_compose_agree(
     layout_f = compute_layout(f)
     layout_g = compute_layout(g)
     compose_morphs = f.compose(g)
-    layout_compose = nullify_zero_strides(compute_layout(compose_morphs))
+    layout_compose = compute_layout(compose_morphs)
     compose_layout = cute.composition(layout_g, layout_f)
     return layout_compose == compose_layout
+
+@cute.jit
+def Nest_coalesce_agree(f: cutlass.Constexpr[Nest_morphism]) -> bool:
+    """
+    Check if nested morphism coalescence agrees with layout coalescence.
+    
+    :param f: Nest morphism to test
+    :type f: Nest_morphism
+    :return: True if coalesce operations agree
+    :rtype: bool
+    """
+    coalesce_f = f.coalesce()
+    layout_f = compute_layout(f)
+    coalesce_layout = compute_layout(coalesce_f)
+    layout_coalesce = cute.coalesce(layout_f)
+    return coalesce_layout == layout_coalesce
 
 
 @cute.jit
@@ -367,16 +383,15 @@ def Nest_logical_product_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.C
     layout_f = compute_layout(f)
     layout_g = compute_layout(g)
     product = f.logical_product(g)
-    product_layout = nullify_zero_strides(cute.logical_product(layout_f,layout_g))
-    layout_product = nullify_zero_strides(compute_layout(product))
+    product_layout = cute.logical_product(layout_f, layout_g)
+    layout_product = compute_layout(product)
     return layout_product == product_layout
 
 
 @cute.jit
 def Nest_logical_divide_agree(f: cutlass.Constexpr[Nest_morphism], g: cutlass.Constexpr[Nest_morphism]):
     morphism_quotient = f.logical_divide(g)
-    layout_quotient = nullify_zero_strides(compute_layout(morphism_quotient))
-
+    layout_quotient = compute_layout(morphism_quotient)
     layout_f = compute_layout(f)
     layout_g = compute_layout(g)
     layout_g_complement = cute.complement(layout_g,cute.size(layout_f))
@@ -447,16 +462,22 @@ class TestNestMorphism:
             pytest.skip(f"Skipped due to cosize overflow: {e}")
 
     @pytest.mark.parametrize("iteration", iterations)
-    def test_Nest_logical_product_agree(self,iteration):
+    def test_Nest_coalesce_agree(self, iteration):
         np.random.seed(RANDOM_SEED_BASE + iteration)
-        f,g = random_product_admissible_Nest_morphisms()
-        assert Nest_logical_product_agree(f,g)
+        f = random_Nest_morphism(max_value=10)
+        assert Nest_coalesce_agree(f)
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_Nest_logical_divide_agree(self,iteration):
         np.random.seed(RANDOM_SEED_BASE + iteration)
         f,g = random_divisible_Nest_morphisms()
         assert Nest_logical_divide_agree(f,g)
+
+    @pytest.mark.parametrize("iteration", iterations)
+    def test_Nest_logical_product_agree(self,iteration):
+        np.random.seed(RANDOM_SEED_BASE + iteration)
+        f,g = random_product_admissible_Nest_morphisms()
+        assert Nest_logical_product_agree(f,g)
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_Nest_compose_agree(self, iteration):
@@ -529,7 +550,7 @@ class TestMorphismProperties:
         assert f.compose(identity).map == f.map
     
     def test_complement_involution(self):
-        """Test that complement is an involution."""
+        """Test that complement is an involution, up to sorting."""
         np.random.seed(RANDOM_SEED_BASE)
         
         f = random_complementable_Tuple_morphism(max_length=6, max_value=10)
