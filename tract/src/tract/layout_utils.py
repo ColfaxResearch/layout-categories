@@ -7,6 +7,7 @@ and CuTe layouts, enabling GPU kernel optimizations.
 
 import cutlass
 import cutlass.cute as cute
+from tract.tuple_morph_tikz import nested_tuple_morphism_to_tikz, two_parenthesizations_to_tikz_values
 
 from .categories import (
     Fin_morphism,
@@ -314,6 +315,20 @@ def compute_Nest_morphism(layout: cute.Layout) -> Nest_morphism:
 
 compute_morphism = compute_Nest_morphism
 
+def layout_to_tikz(layout: cute.Layout, full_doc=False) -> str:
+    morphism = compute_Nest_morphism(layout)
+    layout_str = str(layout)
+    tikz_str = nested_tuple_morphism_to_tikz(
+        morphism,
+        row_spacing=0.8,
+        tree_width=2.2,
+        map_width=3.0,
+        root_y_offset=0.0,
+        label=f"${layout_str}$",
+        full_doc=full_doc,
+    )
+    return tikz_str
+
 def flat_complement(flat_layout: cute.Layout, N: int) -> cute.Layout:
     """
     Compute the complement of a flat layout with respect to size N.
@@ -417,6 +432,30 @@ def mutual_refinement(nestedtuple1: NestedTuple, nestedtuple2: NestedTuple):
     result2 = nestedtuple2.sub(tuple(result2))
     return result1, result2
 
+def mutual_refinement_to_tikz(nestedtuple1: NestedTuple, nestedtuple2: NestedTuple) -> str:
+    """
+    Generate a TikZ diagram illustrating the mutual refinement of two nested tuples.
+    
+    :param nestedtuple1: First nested tuple
+    :type nestedtuple1: NestedTuple
+    :param nestedtuple2: Second nested tuple
+    :type nestedtuple2: NestedTuple
+    :return: TikZ diagram as a string
+    :rtype: str
+    """
+    Tprime, Uprime = mutual_refinement(nestedtuple1, nestedtuple2)
+    tikz_str = two_parenthesizations_to_tikz_values(
+        Uprime.flatten(),
+        Tprime.data,
+        Uprime.data,
+        row_spacing=0.8,
+        left_width=2.5,
+        right_width=2.5,
+        root_y_offset=0.0,
+        center_label=f"${Tprime} \\quad {Uprime}$",
+        full_doc=False,
+    )
+    return tikz_str
 
 def weak_composite(f: Nest_morphism, g: Nest_morphism) -> Nest_morphism:
     """
