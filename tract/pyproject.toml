@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 keywords = ["category-theory", "morphisms", "gpu", "cuda", "cute", "layouts"]
 dependencies = [
-    "nvidia-cutlass-dsl>=4.2.0",
+    "nvidia-cutlass-dsl>=4.2.0; platform_system == 'Linux'",
     "numpy>=1.23.0",
 ]
 
