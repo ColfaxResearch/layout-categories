@@ -3,9 +3,9 @@ Test suite for the category Fact, accompanying Colfax Research's work
 "Categorical Foundations for CuTe Layouts".
 
 Tests validation, identity, composition, sum, and the NestedTuple bridge for
-Fact_morphism. Unlike morphism_tests.py, these tests have no CuTe counterpart
+FactMorphism. Unlike morphism_tests.py, these tests have no CuTe counterpart
 to compare against, so they verify the category laws directly using the
-structural equality on Fact_morphism.
+structural equality on FactMorphism.
 
 Run with: pytest tests/fact_morphism_tests.py
 """
@@ -13,7 +13,11 @@ Run with: pytest tests/fact_morphism_tests.py
 import numpy as np
 import pytest
 
-from tract import Fact_morphism, NestedTuple, random_Tuple_morphism
+from .conftest import seed_rngs
+
+from tract import FactMorphism, NestedTuple
+
+from .generators import random_Tuple_morphism
 
 iterations = range(100)
 RANDOM_SEED_BASE = 42
@@ -26,7 +30,7 @@ RANDOM_SEED_BASE = 42
 
 def random_Fact_morphism(
     max_codomain_length: int = 4, max_mode_length: int = 3, max_entry: int = 8
-) -> Fact_morphism:
+) -> FactMorphism:
     """
     Generate a random Fact morphism by generating random modes and deriving
     the domain (flattening) and codomain (entrywise products).
@@ -38,7 +42,7 @@ def random_Fact_morphism(
     :param max_entry: Maximum value of each domain entry
     :type max_entry: int
     :return: Random Fact morphism
-    :rtype: Fact_morphism
+    :rtype: FactMorphism
     """
     n = np.random.randint(1, max_codomain_length + 1)
     modes = []
@@ -48,18 +52,18 @@ def random_Fact_morphism(
     modes = tuple(modes)
     domain = tuple(entry for mode in modes for entry in mode)
     codomain = tuple(int(np.prod(mode)) for mode in modes)
-    return Fact_morphism(domain, codomain, modes)
+    return FactMorphism(domain, codomain, modes)
 
 
-def random_coarsening(f: Fact_morphism) -> Fact_morphism:
+def random_coarsening(f: FactMorphism) -> FactMorphism:
     """
     Generate a random Fact morphism whose domain is f's codomain, by grouping
     the codomain of f into consecutive blocks.
 
     :param f: Fact morphism to coarsen the codomain of
-    :type f: Fact_morphism
+    :type f: FactMorphism
     :return: Random Fact morphism composable with f
-    :rtype: Fact_morphism
+    :rtype: FactMorphism
     """
     entries = list(f.codomain)
     modes = []
@@ -69,10 +73,10 @@ def random_coarsening(f: Fact_morphism) -> Fact_morphism:
         entries = entries[k:]
     modes = tuple(modes)
     codomain = tuple(int(np.prod(mode)) for mode in modes)
-    return Fact_morphism(f.codomain, codomain, modes)
+    return FactMorphism(f.codomain, codomain, modes)
 
 
-def random_Fact_refinement_of(codomain) -> Fact_morphism:
+def random_Fact_refinement_of(codomain) -> FactMorphism:
     """
     Generate a random Fact morphism with the given codomain, by choosing a
     random factorization of each codomain entry (a random consecutive
@@ -81,7 +85,7 @@ def random_Fact_refinement_of(codomain) -> Fact_morphism:
     :param codomain: Codomain tuple
     :type codomain: Tuple[int]
     :return: Random Fact morphism onto codomain
-    :rtype: Fact_morphism
+    :rtype: FactMorphism
     """
     modes = []
     for t in codomain:
@@ -108,7 +112,7 @@ def random_Fact_refinement_of(codomain) -> Fact_morphism:
         modes.append(tuple(mode))
     modes = tuple(modes)
     domain = tuple(entry for mode in modes for entry in mode)
-    return Fact_morphism(domain, tuple(codomain), modes)
+    return FactMorphism(domain, tuple(codomain), modes)
 
 
 def random_composable_Fact_morphisms():
@@ -116,7 +120,7 @@ def random_composable_Fact_morphisms():
     Generate a random composable pair (f, g) with f.codomain == g.domain.
 
     :return: Composable pair of Fact morphisms
-    :rtype: tuple[Fact_morphism, Fact_morphism]
+    :rtype: tuple[FactMorphism, FactMorphism]
     """
     f = random_Fact_morphism()
     g = random_coarsening(f)
@@ -129,7 +133,7 @@ def random_composable_Fact_morphisms():
 
 
 class TestFactMorphismValidation:
-    """Tests for Fact_morphism construction and validation."""
+    """Tests for FactMorphism construction and validation."""
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_random_construction_is_valid(self, iteration):
@@ -140,7 +144,7 @@ class TestFactMorphismValidation:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
         assert len(f.modes) == len(f.codomain)
         assert tuple(entry for mode in f.modes for entry in mode) == f.domain
@@ -151,21 +155,21 @@ class TestFactMorphismValidation:
         rejected.
         """
         with pytest.raises(ValueError, match="prod"):
-            Fact_morphism((2, 3), (5,), ((2, 3),))
+            FactMorphism((2, 3), (5,), ((2, 3),))
 
     def test_invalid_flattening_raises(self):
         """
         Test that modes whose flattening differs from the domain are rejected.
         """
         with pytest.raises(ValueError, match="Flattening"):
-            Fact_morphism((3, 2), (6,), ((2, 3),))
+            FactMorphism((3, 2), (6,), ((2, 3),))
 
     def test_wrong_mode_count_raises(self):
         """
         Test that a mode count different from the codomain length is rejected.
         """
         with pytest.raises(ValueError, match="Number of modes"):
-            Fact_morphism((2, 3), (2, 3), ((2, 3),))
+            FactMorphism((2, 3), (2, 3), ((2, 3),))
 
     def test_nonpositive_entries_raise(self):
         """
@@ -173,16 +177,16 @@ class TestFactMorphismValidation:
         rejected.
         """
         with pytest.raises(ValueError, match="positive"):
-            Fact_morphism((0, 3), (0, 3), ((0,), (3,)))
+            FactMorphism((0, 3), (0, 3), ((0,), (3,)))
         with pytest.raises(ValueError, match="positive"):
-            Fact_morphism((2,), (-2,), ((2,),))
+            FactMorphism((2,), (-2,), ((2,),))
 
     def test_empty_mode_is_allowed(self):
         """
         Test that an empty mode (empty product = 1) over a codomain entry of 1
         is a valid morphism.
         """
-        f = Fact_morphism((2,), (2, 1), ((2,), ()))
+        f = FactMorphism((2,), (2, 1), ((2,), ()))
         assert f.size() == f.cosize() == 2
 
     @pytest.mark.parametrize("iteration", iterations)
@@ -193,7 +197,7 @@ class TestFactMorphismValidation:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
         assert f.size() == f.cosize()
 
@@ -209,9 +213,9 @@ class TestFactMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
-        assert Fact_morphism.identity(f.codomain).is_identity()
+        assert FactMorphism.identity(f.codomain).is_identity()
         assert f.is_identity() == all(len(mode) == 1 for mode in f.modes)
 
     @pytest.mark.parametrize("iteration", iterations)
@@ -222,21 +226,21 @@ class TestFactMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
-        assert f.compose(Fact_morphism.identity(f.codomain)) == f
-        assert Fact_morphism.identity(f.domain).compose(f) == f
+        assert f.compose(FactMorphism.identity(f.codomain)) == f
+        assert FactMorphism.identity(f.domain).compose(f) == f
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_compose_domain_codomain(self, iteration):
         """
         Test that composites have the correct domain and codomain (validity is
-        checked by the Fact_morphism constructor during composition).
+        checked by the FactMorphism constructor during composition).
 
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f, g = random_composable_Fact_morphisms()
         assert f.are_composable(g)
         composite = f.compose(g)
@@ -251,7 +255,7 @@ class TestFactMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
         g = random_Fact_morphism()
         if f.codomain == g.domain:
@@ -267,7 +271,7 @@ class TestFactMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f, g = random_composable_Fact_morphisms()
         h = random_coarsening(g)
         assert f.compose(g).compose(h) == f.compose(g.compose(h))
@@ -284,7 +288,7 @@ class TestFactMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
         g = random_Fact_morphism()
         s = f.sum(g)
@@ -300,7 +304,7 @@ class TestFactMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f, g = random_composable_Fact_morphisms()
         fprime, gprime = random_composable_Fact_morphisms()
         assert f.compose(g).sum(fprime.compose(gprime)) == f.sum(fprime).compose(
@@ -316,16 +320,16 @@ class TestFactMorphismPullbackPushforward:
         """
         Test that pulling back a Tuple morphism along a Fact morphism agrees
         with the general refinement implementation
-        (Nest_morphism.pullback_along).
+        (NestMorphism.pullback_along).
 
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Tuple_morphism(max_value=10)
         F = random_Fact_refinement_of(f.codomain)
         special = F.pullback(f)
-        general = f.to_Nest_morphism().pullback_along(F.refined_codomain())
+        general = f.to_nest_morphism().pullback_along(F.refined_codomain())
         assert special.domain == general.domain.flatten()
         assert special.codomain == general.codomain.flatten()
         assert special.map == general.map
@@ -335,16 +339,16 @@ class TestFactMorphismPullbackPushforward:
         """
         Test that pushing forward a Tuple morphism along a Fact morphism
         agrees with the general refinement implementation
-        (Nest_morphism.pushforward_along).
+        (NestMorphism.pushforward_along).
 
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Tuple_morphism(max_value=10)
         F = random_Fact_refinement_of(f.domain)
         special = F.pushforward(f)
-        general = f.to_Nest_morphism().pushforward_along(F.refined_codomain())
+        general = f.to_nest_morphism().pushforward_along(F.refined_codomain())
         assert special.domain == general.domain.flatten()
         assert special.codomain == general.codomain.flatten()
         assert special.map == general.map
@@ -358,7 +362,7 @@ class TestFactMorphismPullbackPushforward:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Tuple_morphism(max_value=10)
         F = random_Fact_refinement_of(f.codomain)
         pullback = F.pullback(f)
@@ -374,19 +378,19 @@ class TestFactMorphismPullbackPushforward:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Tuple_morphism(max_value=10)
         for g in (
-            Fact_morphism.identity(f.codomain).pullback(f),
-            Fact_morphism.identity(f.domain).pushforward(f),
+            FactMorphism.identity(f.codomain).pullback(f),
+            FactMorphism.identity(f.domain).pushforward(f),
         ):
-            assert (g.domain, g.codomain, g.map) == (f.domain, f.codomain, f.map)
+            assert g == f
 
     def test_mismatched_boundaries_raise(self):
         """
         Test that pullback and pushforward reject mismatched morphisms.
         """
-        F = Fact_morphism((2, 3), (6,), ((2, 3),))
+        F = FactMorphism((2, 3), (6,), ((2, 3),))
         f = random_Tuple_morphism(max_value=10)
         if f.codomain != F.codomain:
             with pytest.raises(ValueError, match="Codomain"):
@@ -407,7 +411,7 @@ class TestFactMorphismNestedTupleBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
         assert f.refined_codomain().refines(NestedTuple(f.codomain))
 
@@ -420,9 +424,9 @@ class TestFactMorphismNestedTupleBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Fact_morphism()
-        rebuilt = Fact_morphism.from_refinement(
+        rebuilt = FactMorphism.from_refinement(
             f.refined_codomain(), NestedTuple(f.codomain)
         )
         assert rebuilt == f
@@ -433,10 +437,10 @@ class TestFactMorphismNestedTupleBridge:
         refinement with non-flat relative modes.
         """
         with pytest.raises(ValueError, match="flat"):
-            Fact_morphism.from_refinement(
+            FactMorphism.from_refinement(
                 NestedTuple(((2, 2), (3,))), NestedTuple(((4,), 3))
             )
         with pytest.raises(ValueError, match="flat"):
-            Fact_morphism.from_refinement(
+            FactMorphism.from_refinement(
                 NestedTuple((((2, 2), 2), (3,))), NestedTuple((8, 3))
             )

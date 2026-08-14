@@ -9,20 +9,26 @@ description = "A Python library for category-theoretic foundations of CuTe layou
 readme = "README.md"
 requires-python = ">=3.12"
 keywords = ["category-theory", "morphisms", "gpu", "cuda", "cute", "layouts"]
-dependencies = [
-    "nvidia-cutlass-dsl>=4.2.0",
-    "numpy>=1.23.0",
-]
+dependencies = []
 
 [project.optional-dependencies]
+# CuTe DSL layout backend (tract.backends.cute_dsl). The pycute backend
+# instead requires a local install of https://github.com/NVlabs/CuTe.
+cute = [
+    "nvidia-cutlass-dsl>=4.2.0",
+]
 dev = [
     "pytest>=7.0.0",
+    "numpy>=1.23.0",
 ]
 
 [project.urls]
 "Homepage" = "https://research.colfax-intl.com/categorical-foundations-for-cute-layouts/"
 "Bug Reports" = "https://github.com/ColfaxResearch/layout-categories/issues"
 "Source" = "https://github.com/ColfaxResearch/layout-categories"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}

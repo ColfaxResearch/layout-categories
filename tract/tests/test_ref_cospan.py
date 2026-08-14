@@ -13,16 +13,19 @@ Run with: pytest tests/ref_cospan_tests.py
 import numpy as np
 import pytest
 
+from .conftest import seed_rngs
+
 from tract import (
-    CoSpan_morphism,
+    CoSpanMorphism,
     NestedTuple,
-    Ref_morphism,
-    RefCoSpan_morphism,
-    Tuple_morphism,
-    random_Tuple_morphism,
+    RefMorphism,
+    RefCoSpanMorphism,
+    TupleMorphism,
 )
 
-from .ref_morphism_tests import random_nest_over
+from .generators import random_Tuple_morphism
+
+from .test_ref_morphism import random_nest_over
 
 iterations = range(100)
 RANDOM_SEED_BASE = 42
@@ -33,7 +36,7 @@ RANDOM_SEED_BASE = 42
 # *************************************************************************
 
 
-def random_RefCoSpan_morphism(domain=None) -> RefCoSpan_morphism:
+def random_RefCoSpan_morphism(domain=None) -> RefCoSpanMorphism:
     """
     Generate a random cospan, optionally with a prescribed domain U. The
     forward leg is a random Tuple morphism out of U, and the backward leg
@@ -42,14 +45,14 @@ def random_RefCoSpan_morphism(domain=None) -> RefCoSpan_morphism:
     :param domain: Domain tuple U (optional)
     :type domain: Tuple[int] or None
     :return: Random cospan
-    :rtype: RefCoSpan_morphism
+    :rtype: RefCoSpanMorphism
     """
     if domain is None:
         left = random_Tuple_morphism(max_value=10)
     else:
         left = random_Tuple_morphism(domain=tuple(domain), max_value=10)
-    right = Ref_morphism(NestedTuple(random_nest_over(left.codomain)))
-    return RefCoSpan_morphism(left, right)
+    right = RefMorphism(NestedTuple(random_nest_over(left.codomain)))
+    return RefCoSpanMorphism(left, right)
 
 
 def random_composable_RefCoSpan_morphisms():
@@ -60,7 +63,7 @@ def random_composable_RefCoSpan_morphisms():
     convention of morphism_tests.py.
 
     :return: Composable pair of cospans
-    :rtype: tuple[RefCoSpan_morphism, RefCoSpan_morphism]
+    :rtype: tuple[RefCoSpanMorphism, RefCoSpanMorphism]
     """
     f = random_RefCoSpan_morphism()
     g = random_RefCoSpan_morphism(domain=f.codomain)
@@ -73,7 +76,7 @@ def random_composable_RefCoSpan_morphisms():
 
 
 class TestRefCoSpanMorphismValidation:
-    """Tests for RefCoSpan_morphism construction and validation."""
+    """Tests for RefCoSpanMorphism construction and validation."""
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_random_construction_is_valid(self, iteration):
@@ -83,7 +86,7 @@ class TestRefCoSpanMorphismValidation:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefCoSpan_morphism()
         assert f.nadir == f.left.codomain == f.right.domain
         assert f.domain == f.left.domain
@@ -94,21 +97,21 @@ class TestRefCoSpanMorphismValidation:
         """
         Test that legs with different nadirs are rejected.
         """
-        left = Tuple_morphism((5,), (5,), (1,))
-        right = Ref_morphism(NestedTuple(((2, 3),)))
+        left = TupleMorphism((5,), (5,), (1,))
+        right = RefMorphism(NestedTuple(((2, 3),)))
         with pytest.raises(ValueError, match="nadir"):
-            RefCoSpan_morphism(left, right)
+            RefCoSpanMorphism(left, right)
 
     def test_wrong_leg_types_raise(self):
         """
         Test that legs of the wrong type are rejected.
         """
-        ref = Ref_morphism(NestedTuple((6,)))
-        tup = Tuple_morphism((6,), (6,), (1,))
+        ref = RefMorphism(NestedTuple((6,)))
+        tup = TupleMorphism((6,), (6,), (1,))
         with pytest.raises(ValueError, match="Left leg"):
-            RefCoSpan_morphism(ref, ref)
+            RefCoSpanMorphism(ref, ref)
         with pytest.raises(ValueError, match="Right leg"):
-            RefCoSpan_morphism(tup, tup)
+            RefCoSpanMorphism(tup, tup)
 
 
 class TestRefCoSpanMorphismCategoryLaws:
@@ -122,9 +125,9 @@ class TestRefCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefCoSpan_morphism()
-        assert RefCoSpan_morphism.identity(f.domain).is_identity()
+        assert RefCoSpanMorphism.identity(f.domain).is_identity()
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_identity_is_two_sided_unit(self, iteration):
@@ -134,10 +137,10 @@ class TestRefCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefCoSpan_morphism()
-        assert f.compose(RefCoSpan_morphism.identity(f.codomain)) == f
-        assert RefCoSpan_morphism.identity(f.domain).compose(f) == f
+        assert f.compose(RefCoSpanMorphism.identity(f.codomain)) == f
+        assert RefCoSpanMorphism.identity(f.domain).compose(f) == f
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_compose_boundaries(self, iteration):
@@ -147,7 +150,7 @@ class TestRefCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefCoSpan_morphisms()
         except (ValueError, OverflowError) as e:
@@ -166,7 +169,7 @@ class TestRefCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefCoSpan_morphism()
         g = random_RefCoSpan_morphism()
         if f.codomain == g.domain:
@@ -183,7 +186,7 @@ class TestRefCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefCoSpan_morphisms()
             h = random_RefCoSpan_morphism(domain=g.codomain)
@@ -203,7 +206,7 @@ class TestRefCoSpanMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefCoSpan_morphism()
         g = random_RefCoSpan_morphism()
         s = f.sum(g)
@@ -219,7 +222,7 @@ class TestRefCoSpanMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefCoSpan_morphisms()
             fprime, gprime = random_composable_RefCoSpan_morphisms()
@@ -241,13 +244,13 @@ class TestRefCoSpanCoSpanBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefCoSpan_morphisms()
         except (ValueError, OverflowError) as e:
             pytest.skip(f"Skipped due to generator failure: {e}")
-        assert f.compose(g).to_CoSpan_morphism() == f.to_CoSpan_morphism().compose(
-            g.to_CoSpan_morphism()
+        assert f.compose(g).to_cospan_morphism() == f.to_cospan_morphism().compose(
+            g.to_cospan_morphism()
         )
 
     @pytest.mark.parametrize("iteration", iterations)
@@ -259,14 +262,14 @@ class TestRefCoSpanCoSpanBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefCoSpan_morphism()
-        cospan = f.to_CoSpan_morphism()
+        cospan = f.to_cospan_morphism()
         assert cospan.nadir == f.nadir
         assert cospan.domain == f.domain
         assert cospan.codomain == f.codomain
-        assert RefCoSpan_morphism.identity(f.domain).to_CoSpan_morphism() == (
-            CoSpan_morphism.identity(f.domain)
+        assert RefCoSpanMorphism.identity(f.domain).to_cospan_morphism() == (
+            CoSpanMorphism.identity(f.domain)
         )
 
     @pytest.mark.parametrize("iteration", iterations)
@@ -279,18 +282,18 @@ class TestRefCoSpanCoSpanBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefCoSpan_morphisms()
         except (ValueError, OverflowError) as e:
             pytest.skip(f"Skipped due to generator failure: {e}")
-        cospan_f = f.to_CoSpan_morphism()
-        cospan_g = g.to_CoSpan_morphism()
-        lifted_f = RefCoSpan_morphism.from_CoSpan_morphism(cospan_f)
-        lifted_g = RefCoSpan_morphism.from_CoSpan_morphism(cospan_g)
-        assert lifted_f.to_CoSpan_morphism() == cospan_f
-        assert lifted_g.to_CoSpan_morphism() == cospan_g
-        assert lifted_f.compose(lifted_g).to_CoSpan_morphism() == cospan_f.compose(
+        cospan_f = f.to_cospan_morphism()
+        cospan_g = g.to_cospan_morphism()
+        lifted_f = RefCoSpanMorphism.from_cospan_morphism(cospan_f)
+        lifted_g = RefCoSpanMorphism.from_cospan_morphism(cospan_g)
+        assert lifted_f.to_cospan_morphism() == cospan_f
+        assert lifted_g.to_cospan_morphism() == cospan_g
+        assert lifted_f.compose(lifted_g).to_cospan_morphism() == cospan_f.compose(
             cospan_g
         )
 

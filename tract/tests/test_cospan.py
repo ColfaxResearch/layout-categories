@@ -3,7 +3,7 @@ Test suite for the category CoSpan, accompanying Colfax Research's work
 "Categorical Foundations for CuTe Layouts".
 
 Tests validation, identity, composition (built on pushforward along Fact
-morphisms), and sum for CoSpan_morphism, verifying the category laws hold
+morphisms), and sum for CoSpanMorphism, verifying the category laws hold
 strictly for the chosen pushforward construction.
 
 Run with: pytest tests/cospan_tests.py
@@ -12,12 +12,15 @@ Run with: pytest tests/cospan_tests.py
 import numpy as np
 import pytest
 
+from .conftest import seed_rngs
+
 from tract import (
-    CoSpan_morphism,
-    Fact_morphism,
-    Tuple_morphism,
-    random_Tuple_morphism,
+    CoSpanMorphism,
+    FactMorphism,
+    TupleMorphism,
 )
+
+from .generators import random_Tuple_morphism
 
 iterations = range(100)
 RANDOM_SEED_BASE = 42
@@ -28,7 +31,7 @@ RANDOM_SEED_BASE = 42
 # *************************************************************************
 
 
-def random_Fact_coarsening_of(domain) -> Fact_morphism:
+def random_Fact_coarsening_of(domain) -> FactMorphism:
     """
     Generate a random Fact morphism with the given domain, by grouping the
     domain into random consecutive blocks.
@@ -36,7 +39,7 @@ def random_Fact_coarsening_of(domain) -> Fact_morphism:
     :param domain: Domain tuple
     :type domain: Tuple[int]
     :return: Random Fact morphism out of domain
-    :rtype: Fact_morphism
+    :rtype: FactMorphism
     """
     entries = list(domain)
     modes = []
@@ -46,10 +49,10 @@ def random_Fact_coarsening_of(domain) -> Fact_morphism:
         entries = entries[k:]
     modes = tuple(modes)
     codomain = tuple(int(np.prod(mode)) for mode in modes)
-    return Fact_morphism(tuple(domain), codomain, modes)
+    return FactMorphism(tuple(domain), codomain, modes)
 
 
-def random_CoSpan_morphism(domain=None) -> CoSpan_morphism:
+def random_CoSpan_morphism(domain=None) -> CoSpanMorphism:
     """
     Generate a random cospan, optionally with a prescribed domain U. The
     forward leg is a random Tuple morphism out of U, and the backward leg is
@@ -58,14 +61,14 @@ def random_CoSpan_morphism(domain=None) -> CoSpan_morphism:
     :param domain: Domain tuple U (optional)
     :type domain: Tuple[int] or None
     :return: Random cospan
-    :rtype: CoSpan_morphism
+    :rtype: CoSpanMorphism
     """
     if domain is None:
         left = random_Tuple_morphism(max_value=10)
     else:
         left = random_Tuple_morphism(domain=tuple(domain), max_value=10)
     right = random_Fact_coarsening_of(left.codomain)
-    return CoSpan_morphism(left, right)
+    return CoSpanMorphism(left, right)
 
 
 def random_composable_CoSpan_morphisms():
@@ -76,7 +79,7 @@ def random_composable_CoSpan_morphisms():
     convention of morphism_tests.py.
 
     :return: Composable pair of cospans
-    :rtype: tuple[CoSpan_morphism, CoSpan_morphism]
+    :rtype: tuple[CoSpanMorphism, CoSpanMorphism]
     """
     f = random_CoSpan_morphism()
     g = random_CoSpan_morphism(domain=f.codomain)
@@ -89,7 +92,7 @@ def random_composable_CoSpan_morphisms():
 
 
 class TestCoSpanMorphismValidation:
-    """Tests for CoSpan_morphism construction and validation."""
+    """Tests for CoSpanMorphism construction and validation."""
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_random_construction_is_valid(self, iteration):
@@ -99,7 +102,7 @@ class TestCoSpanMorphismValidation:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_CoSpan_morphism()
         assert f.nadir == f.left.codomain == f.right.domain
         assert f.domain == f.left.domain
@@ -109,21 +112,21 @@ class TestCoSpanMorphismValidation:
         """
         Test that legs with different nadirs are rejected.
         """
-        left = Tuple_morphism((5,), (5,), (1,))
-        right = Fact_morphism((2, 3), (6,), ((2, 3),))
+        left = TupleMorphism((5,), (5,), (1,))
+        right = FactMorphism((2, 3), (6,), ((2, 3),))
         with pytest.raises(ValueError, match="nadir"):
-            CoSpan_morphism(left, right)
+            CoSpanMorphism(left, right)
 
     def test_wrong_leg_types_raise(self):
         """
         Test that legs of the wrong type are rejected.
         """
-        fact = Fact_morphism((6,), (6,), ((6,),))
-        tup = Tuple_morphism((6,), (6,), (1,))
+        fact = FactMorphism((6,), (6,), ((6,),))
+        tup = TupleMorphism((6,), (6,), (1,))
         with pytest.raises(ValueError, match="Left leg"):
-            CoSpan_morphism(fact, fact)
+            CoSpanMorphism(fact, fact)
         with pytest.raises(ValueError, match="Right leg"):
-            CoSpan_morphism(tup, tup)
+            CoSpanMorphism(tup, tup)
 
 
 class TestCoSpanMorphismCategoryLaws:
@@ -137,9 +140,9 @@ class TestCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_CoSpan_morphism()
-        assert CoSpan_morphism.identity(f.domain).is_identity()
+        assert CoSpanMorphism.identity(f.domain).is_identity()
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_identity_is_two_sided_unit(self, iteration):
@@ -149,10 +152,10 @@ class TestCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_CoSpan_morphism()
-        assert f.compose(CoSpan_morphism.identity(f.codomain)) == f
-        assert CoSpan_morphism.identity(f.domain).compose(f) == f
+        assert f.compose(CoSpanMorphism.identity(f.codomain)) == f
+        assert CoSpanMorphism.identity(f.domain).compose(f) == f
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_compose_boundaries(self, iteration):
@@ -163,7 +166,7 @@ class TestCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_CoSpan_morphisms()
         except ValueError as e:
@@ -182,7 +185,7 @@ class TestCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_CoSpan_morphism()
         g = random_CoSpan_morphism()
         if f.codomain == g.domain:
@@ -199,7 +202,7 @@ class TestCoSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_CoSpan_morphisms()
             h = random_CoSpan_morphism(domain=g.codomain)
@@ -219,7 +222,7 @@ class TestCoSpanMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_CoSpan_morphism()
         g = random_CoSpan_morphism()
         s = f.sum(g)
@@ -235,7 +238,7 @@ class TestCoSpanMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_CoSpan_morphisms()
             fprime, gprime = random_composable_CoSpan_morphisms()

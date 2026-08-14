@@ -1,4 +1,4 @@
-from tract import Tuple_morphism, NestedTuple, Nest_morphism, make_morphism
+from .categories import TupleMorphism, NestedTuple, NestMorphism
 
 PREAMBLE = r"""
 \documentclass{standalone}
@@ -116,7 +116,7 @@ def process_mode(
 
 
 def nested_tuple_morphism_to_tikz(
-    morphism: Nest_morphism,
+    morphism: NestMorphism,
     *,
     row_spacing: float = 0.8,
     tree_width: float = 5.0,
@@ -136,7 +136,7 @@ def nested_tuple_morphism_to_tikz(
     - Label (if provided) is horizontally centered over what is actually drawn.
     """
     domain_nt: NestedTuple = morphism.domain
-    flat_tm: Tuple_morphism = morphism.flatten()
+    flat_tm: TupleMorphism = morphism.flatten()
     ret = []
 
     has_tree = domain_nt.depth() > 1
@@ -477,7 +477,7 @@ def two_parenthesizations_to_tikz_values(
 # ============================
 if __name__ == "__main__":
     # Existing morphism example (unchanged)
-    m = Nest_morphism(
+    m = NestMorphism(
         domain=(16, ((4, 4), (4, 4)), (2, 2)),
         codomain=(16, 4, 4),
         map=(1, 2, 0, 3, 0, 0, 0),

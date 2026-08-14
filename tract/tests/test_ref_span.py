@@ -13,16 +13,19 @@ Run with: pytest tests/ref_span_tests.py
 import numpy as np
 import pytest
 
+from .conftest import seed_rngs
+
 from tract import (
     NestedTuple,
-    Ref_morphism,
-    RefSpan_morphism,
-    Span_morphism,
-    Tuple_morphism,
-    random_Tuple_morphism,
+    RefMorphism,
+    RefSpanMorphism,
+    SpanMorphism,
+    TupleMorphism,
 )
 
-from .ref_morphism_tests import random_nest_over
+from .generators import random_Tuple_morphism
+
+from .test_ref_morphism import random_nest_over
 
 iterations = range(100)
 RANDOM_SEED_BASE = 42
@@ -33,7 +36,7 @@ RANDOM_SEED_BASE = 42
 # *************************************************************************
 
 
-def random_RefSpan_morphism(domain=None) -> RefSpan_morphism:
+def random_RefSpan_morphism(domain=None) -> RefSpanMorphism:
     """
     Generate a random span, optionally with a prescribed domain U. The apex
     is a random nested refinement of U (built by factoring U's entries into
@@ -42,12 +45,12 @@ def random_RefSpan_morphism(domain=None) -> RefSpan_morphism:
     :param domain: Domain tuple U (optional)
     :type domain: Tuple[int] or None
     :return: Random span
-    :rtype: RefSpan_morphism
+    :rtype: RefSpanMorphism
     """
     if domain is None:
         right = random_Tuple_morphism(max_value=10)
-        left = Ref_morphism(NestedTuple(random_nest_over(right.domain)))
-        return RefSpan_morphism(left, right)
+        left = RefMorphism(NestedTuple(random_nest_over(right.domain)))
+        return RefSpanMorphism(left, right)
 
     # Prescribed domain: refine each entry of U into a random nested
     # factorization to obtain the apex, then generate a random forward leg.
@@ -77,10 +80,10 @@ def random_RefSpan_morphism(domain=None) -> RefSpan_morphism:
             top_data.append(factors[0])
         else:
             top_data.append(random_nest_over(factors))
-    left = Ref_morphism(NestedTuple(tuple(top_data)))
+    left = RefMorphism(NestedTuple(tuple(top_data)))
     assert left.codomain == tuple(domain)
     right = random_Tuple_morphism(domain=left.domain, max_value=10)
-    return RefSpan_morphism(left, right)
+    return RefSpanMorphism(left, right)
 
 
 def random_composable_RefSpan_morphisms():
@@ -88,7 +91,7 @@ def random_composable_RefSpan_morphisms():
     Generate a random composable pair (f, g) with f.codomain == g.domain.
 
     :return: Composable pair of spans
-    :rtype: tuple[RefSpan_morphism, RefSpan_morphism]
+    :rtype: tuple[RefSpanMorphism, RefSpanMorphism]
     """
     f = random_RefSpan_morphism()
     g = random_RefSpan_morphism(domain=f.codomain)
@@ -101,7 +104,7 @@ def random_composable_RefSpan_morphisms():
 
 
 class TestRefSpanMorphismValidation:
-    """Tests for RefSpan_morphism construction and validation."""
+    """Tests for RefSpanMorphism construction and validation."""
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_random_construction_is_valid(self, iteration):
@@ -111,7 +114,7 @@ class TestRefSpanMorphismValidation:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefSpan_morphism()
         assert f.apex == f.left.domain == f.right.domain
         assert f.domain == f.left.codomain
@@ -122,21 +125,21 @@ class TestRefSpanMorphismValidation:
         """
         Test that legs with different apexes are rejected.
         """
-        left = Ref_morphism(NestedTuple(((2, 3),)))
-        right = Tuple_morphism((5,), (5,), (1,))
+        left = RefMorphism(NestedTuple(((2, 3),)))
+        right = TupleMorphism((5,), (5,), (1,))
         with pytest.raises(ValueError, match="apex"):
-            RefSpan_morphism(left, right)
+            RefSpanMorphism(left, right)
 
     def test_wrong_leg_types_raise(self):
         """
         Test that legs of the wrong type are rejected.
         """
-        ref = Ref_morphism(NestedTuple((6,)))
-        tup = Tuple_morphism((6,), (6,), (1,))
+        ref = RefMorphism(NestedTuple((6,)))
+        tup = TupleMorphism((6,), (6,), (1,))
         with pytest.raises(ValueError, match="Left leg"):
-            RefSpan_morphism(tup, tup)
+            RefSpanMorphism(tup, tup)
         with pytest.raises(ValueError, match="Right leg"):
-            RefSpan_morphism(ref, ref)
+            RefSpanMorphism(ref, ref)
 
 
 class TestRefSpanMorphismCategoryLaws:
@@ -150,9 +153,9 @@ class TestRefSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefSpan_morphism()
-        assert RefSpan_morphism.identity(f.domain).is_identity()
+        assert RefSpanMorphism.identity(f.domain).is_identity()
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_identity_is_two_sided_unit(self, iteration):
@@ -162,10 +165,10 @@ class TestRefSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefSpan_morphism()
-        assert f.compose(RefSpan_morphism.identity(f.codomain)) == f
-        assert RefSpan_morphism.identity(f.domain).compose(f) == f
+        assert f.compose(RefSpanMorphism.identity(f.codomain)) == f
+        assert RefSpanMorphism.identity(f.domain).compose(f) == f
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_compose_boundaries(self, iteration):
@@ -175,7 +178,7 @@ class TestRefSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefSpan_morphisms()
         except (ValueError, OverflowError) as e:
@@ -194,7 +197,7 @@ class TestRefSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefSpan_morphism()
         g = random_RefSpan_morphism()
         if f.codomain == g.domain:
@@ -211,7 +214,7 @@ class TestRefSpanMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefSpan_morphisms()
             h = random_RefSpan_morphism(domain=g.codomain)
@@ -231,7 +234,7 @@ class TestRefSpanMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefSpan_morphism()
         g = random_RefSpan_morphism()
         s = f.sum(g)
@@ -247,7 +250,7 @@ class TestRefSpanMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefSpan_morphisms()
             fprime, gprime = random_composable_RefSpan_morphisms()
@@ -269,13 +272,13 @@ class TestRefSpanSpanBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefSpan_morphisms()
         except (ValueError, OverflowError) as e:
             pytest.skip(f"Skipped due to generator failure: {e}")
-        assert f.compose(g).to_Span_morphism() == f.to_Span_morphism().compose(
-            g.to_Span_morphism()
+        assert f.compose(g).to_span_morphism() == f.to_span_morphism().compose(
+            g.to_span_morphism()
         )
 
     @pytest.mark.parametrize("iteration", iterations)
@@ -287,14 +290,14 @@ class TestRefSpanSpanBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_RefSpan_morphism()
-        span = f.to_Span_morphism()
+        span = f.to_span_morphism()
         assert span.apex == f.apex
         assert span.domain == f.domain
         assert span.codomain == f.codomain
-        assert RefSpan_morphism.identity(f.domain).to_Span_morphism() == (
-            Span_morphism.identity(f.domain)
+        assert RefSpanMorphism.identity(f.domain).to_span_morphism() == (
+            SpanMorphism.identity(f.domain)
         )
 
     @pytest.mark.parametrize("iteration", iterations)
@@ -306,18 +309,18 @@ class TestRefSpanSpanBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         try:
             f, g = random_composable_RefSpan_morphisms()
         except (ValueError, OverflowError) as e:
             pytest.skip(f"Skipped due to generator failure: {e}")
-        span_f = f.to_Span_morphism()
-        span_g = g.to_Span_morphism()
-        lifted_f = RefSpan_morphism.from_Span_morphism(span_f)
-        lifted_g = RefSpan_morphism.from_Span_morphism(span_g)
-        assert lifted_f.to_Span_morphism() == span_f
-        assert lifted_g.to_Span_morphism() == span_g
-        assert lifted_f.compose(lifted_g).to_Span_morphism() == span_f.compose(
+        span_f = f.to_span_morphism()
+        span_g = g.to_span_morphism()
+        lifted_f = RefSpanMorphism.from_span_morphism(span_f)
+        lifted_g = RefSpanMorphism.from_span_morphism(span_g)
+        assert lifted_f.to_span_morphism() == span_f
+        assert lifted_g.to_span_morphism() == span_g
+        assert lifted_f.compose(lifted_g).to_span_morphism() == span_f.compose(
             span_g
         )
 

@@ -1,26 +1,17 @@
 """
-Test utilities for Tract library.
-
-This module provides random generation functions for morphisms and nested tuples,
-used for property-based testing and validation.
+Random generators for morphisms and nested tuples, used by the
+property-based test suites.
 """
 
 import random
 from math import prod
 import numpy as np
 
-try:
-    import cutlass
-    import cutlass.cute as cute
-except ImportError:
-    cutlass = None
-    cute = None
-
-from .categories import (
-    Fin_morphism,
-    Tuple_morphism,
-    Nest_morphism,
-    NestedTuple
+from tract import (
+    FinMorphism,
+    TupleMorphism,
+    NestMorphism,
+    NestedTuple,
 )
 
 
@@ -61,7 +52,7 @@ def random_Fin_morphism(domain=None, codomain=None, min_length=0, max_length=9):
     :param max_length: Maximum length for random generation
     :type max_length: int
     :return: Random Fin morphism
-    :rtype: Fin_morphism
+    :rtype: FinMorphism
     """
     if domain is None:
         domain = np.random.randint(min_length, max_length + 1)
@@ -71,7 +62,7 @@ def random_Fin_morphism(domain=None, codomain=None, min_length=0, max_length=9):
     permutation1_map = tuple(
         int(x) for x in np.random.permutation(range(1, domain + 1))
     )
-    permutation1 = Fin_morphism(domain, domain, permutation1_map)
+    permutation1 = FinMorphism(domain, domain, permutation1_map)
 
     max_size = min(domain, codomain)
     u = np.random.rand()
@@ -82,15 +73,15 @@ def random_Fin_morphism(domain=None, codomain=None, min_length=0, max_length=9):
     for _ in range(domain - size_of_image):
         projection_map.append(0)
     projection_map = tuple(projection_map)
-    projection = Fin_morphism(domain, size_of_image, projection_map)
+    projection = FinMorphism(domain, size_of_image, projection_map)
 
     inclusion_map = tuple(range(1, size_of_image + 1))
-    inclusion = Fin_morphism(size_of_image, codomain, inclusion_map)
+    inclusion = FinMorphism(size_of_image, codomain, inclusion_map)
 
     permutation2_map = tuple(
         int(x) for x in np.random.permutation(range(1, codomain + 1))
     )
-    permutation2 = Fin_morphism(codomain, codomain, permutation2_map)
+    permutation2 = FinMorphism(codomain, codomain, permutation2_map)
 
     return permutation1.compose(projection).compose(inclusion).compose(permutation2)
 
@@ -110,7 +101,7 @@ def random_complementable_Fin_morphism(
     :param max_length: Maximum length for random generation
     :type max_length: int
     :return: Random complementable Fin morphism
-    :rtype: Fin_morphism
+    :rtype: FinMorphism
     """
     if domain is None:
         domain = np.random.randint(min_length, max_length + 1)
@@ -120,15 +111,15 @@ def random_complementable_Fin_morphism(
     permutation1_map = tuple(
         int(x) for x in np.random.permutation(range(1, domain + 1))
     )
-    permutation1 = Fin_morphism(domain, domain, permutation1_map)
+    permutation1 = FinMorphism(domain, domain, permutation1_map)
 
     inclusion_map = tuple(range(1, domain + 1))
-    inclusion = Fin_morphism(domain, codomain, inclusion_map)
+    inclusion = FinMorphism(domain, codomain, inclusion_map)
 
     permutation2_map = tuple(
         int(x) for x in np.random.permutation(range(1, codomain + 1))
     )
-    permutation2 = Fin_morphism(codomain, codomain, permutation2_map)
+    permutation2 = FinMorphism(codomain, codomain, permutation2_map)
 
     return permutation1.compose(inclusion).compose(permutation2)
 
@@ -152,7 +143,7 @@ def random_Tuple_morphism(
     :param max_value: Maximum value for tuple entries
     :type max_value: int
     :return: Random tuple morphism
-    :rtype: Tuple_morphism
+    :rtype: TupleMorphism
     """
     MAX_VALUE = 2**31 - 1
     assert (domain is None) or (codomain is None)
@@ -177,7 +168,7 @@ def random_Tuple_morphism(
                 codomain.append(domain[underlying_map.index(j)])
             cosize *= codomain[-1]
         codomain = tuple(codomain)
-        return Tuple_morphism(domain, codomain, underlying_map)
+        return TupleMorphism(domain, codomain, underlying_map)
 
     else:
         domain_length = int(np.random.randint(min_length, max_length))
@@ -215,7 +206,7 @@ def random_Tuple_morphism(
             underlying_map = tuple(underlying_map)
         
         assert prod(codomain) < MAX_VALUE
-        return Tuple_morphism(domain, codomain, underlying_map)
+        return TupleMorphism(domain, codomain, underlying_map)
 
 
 def random_composable_Tuple_morphisms(min_length=0, max_length=9, min_value = 1, max_value=10, nondegenerate = True):
@@ -229,7 +220,7 @@ def random_composable_Tuple_morphisms(min_length=0, max_length=9, min_value = 1,
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Pair of composable morphisms (f, g)
-    :rtype: Tuple[Tuple_morphism, Tuple_morphism]
+    :rtype: Tuple[TupleMorphism, TupleMorphism]
     """
     f = random_Tuple_morphism(
         min_length=min_length, max_length=max_length, min_value = min_value, max_value=max_value, nondegenerate=nondegenerate
@@ -258,7 +249,7 @@ def random_Tuple_morphisms_with_disjoint_images(
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Pair of morphisms with disjoint images
-    :rtype: Tuple[Tuple_morphism, Tuple_morphism]
+    :rtype: Tuple[TupleMorphism, TupleMorphism]
     """
     f = random_Tuple_morphism(min_length=min_length, max_length=max_length, min_value = min_value, max_value=max_value, nondegenerate=nondegenerate)
     codomain = f.codomain
@@ -304,7 +295,7 @@ def random_Tuple_morphisms_with_disjoint_images(
                 map_[i-1] = 0
         map_ = tuple(map_)
 
-    g = Tuple_morphism(domain, codomain, map_)
+    g = TupleMorphism(domain, codomain, map_)
     return f, g
 
 
@@ -321,7 +312,7 @@ def random_complementable_Tuple_morphism(min_length=2, max_length=9, min_value=2
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Random complementable morphism
-    :rtype: Tuple_morphism
+    :rtype: TupleMorphism
     """
     if nondegenerate:
         min_value = max(2, min_value)
@@ -345,7 +336,7 @@ def random_complementable_Tuple_morphism(min_length=2, max_length=9, min_value=2
         domain.append(codomain[value - 1])
     domain = tuple(domain)
 
-    return Tuple_morphism(domain, codomain, map_)
+    return TupleMorphism(domain, codomain, map_)
 
 
 def random_divisible_Tuple_morphisms(min_length=2, max_length=9, min_value=1, max_value=10, nondegenerate = True):
@@ -361,7 +352,7 @@ def random_divisible_Tuple_morphisms(min_length=2, max_length=9, min_value=1, ma
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Pair (f, g) where g divides f
-    :rtype: Tuple[Tuple_morphism, Tuple_morphism]
+    :rtype: Tuple[TupleMorphism, TupleMorphism]
     """
     if nondegenerate:
         min_value = max(2, min_value)
@@ -382,7 +373,7 @@ def random_divisible_Tuple_morphisms(min_length=2, max_length=9, min_value=1, ma
             domain[i] = codomain[value - 1]
     domain = tuple(domain)
 
-    g = Tuple_morphism(domain, codomain, map_)
+    g = TupleMorphism(domain, codomain, map_)
     return f, g
 
 
@@ -397,7 +388,7 @@ def random_product_admissible_Tuple_morphisms(min_length=2, max_length=9, min_va
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Pair of product-admissible morphisms
-    :rtype: Tuple[Tuple_morphism, Tuple_morphism]
+    :rtype: Tuple[TupleMorphism, TupleMorphism]
     """
     if nondegenerate:
         min_value = max(2, min_value)
@@ -434,7 +425,7 @@ def random_product_admissible_Tuple_morphisms(min_length=2, max_length=9, min_va
                 map_[i-1] = 0
         map_ = tuple(map_)
 
-    g = Tuple_morphism(domain, codomain, map_)
+    g = TupleMorphism(domain, codomain, map_)
     return f, g
 
 
@@ -520,7 +511,7 @@ def random_Nest_morphism(
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Random nested tuple morphism
-    :rtype: Nest_morphism
+    :rtype: NestMorphism
     """
     assert (domain is None) or (codomain is None)
     
@@ -555,7 +546,7 @@ def random_Nest_morphism(
         domain = random_profile(length=len(flat_domain)).sub(flat_domain)
         codomain = random_profile(length=len(flat_codomain)).sub(flat_codomain)
         
-    return Nest_morphism(domain, codomain, flat_morphism.map)
+    return NestMorphism(domain, codomain, flat_morphism.map)
 
 
 def random_composable_Nest_morphisms(min_length=0, max_length=10, min_value=1, max_value=1024, nondegenerate = True):
@@ -569,7 +560,7 @@ def random_composable_Nest_morphisms(min_length=0, max_length=10, min_value=1, m
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Pair of composable morphisms
-    :rtype: Tuple[Nest_morphism, Nest_morphism]
+    :rtype: Tuple[NestMorphism, NestMorphism]
     """
     f = random_Nest_morphism(
         min_length=min_length, max_length=max_length, min_value=min_value, max_value=max_value, nondegenerate=nondegenerate
@@ -590,7 +581,7 @@ def random_Nest_morphisms_with_disjoint_images(min_length=0, max_length=9, min_v
     Generate a pair of nested tuple morphisms with disjoint images.
     
     :return: Pair of morphisms with disjoint images
-    :rtype: Tuple[Nest_morphism, Nest_morphism]
+    :rtype: Tuple[NestMorphism, NestMorphism]
     """
     flat_f, flat_g = random_Tuple_morphisms_with_disjoint_images(
         min_length=min_length, max_length=max_length, min_value=min_value, max_value=max_value, nondegenerate=nondegenerate
@@ -600,8 +591,8 @@ def random_Nest_morphisms_with_disjoint_images(min_length=0, max_length=9, min_v
     domain_g = random_profile(length=len(flat_g.domain)).sub(flat_g.domain)
     codomain_g = codomain_f
     
-    f = Nest_morphism(domain_f, codomain_f, flat_f.map)
-    g = Nest_morphism(domain_g, codomain_g, flat_g.map)
+    f = NestMorphism(domain_f, codomain_f, flat_f.map)
+    g = NestMorphism(domain_g, codomain_g, flat_g.map)
     return f, g
 
 
@@ -610,7 +601,7 @@ def random_complementable_Nest_morphism(min_length=2, max_length=9, min_value=1,
     Generate a random complementable nested tuple morphism.
     
     :return: Random complementable morphism
-    :rtype: Nest_morphism
+    :rtype: NestMorphism
     """
     flat_f = random_complementable_Tuple_morphism(
         min_length=min_length, max_length=max_length, min_value=min_value, max_value=max_value, nondegenerate=nondegenerate
@@ -618,7 +609,7 @@ def random_complementable_Nest_morphism(min_length=2, max_length=9, min_value=1,
     domain_f = random_NestedTuple(length=len(flat_f.domain)).sub(flat_f.domain)
     codomain_f = random_NestedTuple(length=len(flat_f.codomain)).sub(flat_f.codomain)
     map_f = flat_f.map
-    return Nest_morphism(domain_f, codomain_f, map_f)
+    return NestMorphism(domain_f, codomain_f, map_f)
 
 
 def random_divisible_Nest_morphisms(min_length=2, max_length=9, min_value=2, max_value=10, nondegenerate = True):
@@ -634,7 +625,7 @@ def random_divisible_Nest_morphisms(min_length=2, max_length=9, min_value=2, max
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Pair (f, g) where g divides f
-    :rtype: Tuple[Nest_morphism, Nest_morphism]
+    :rtype: Tuple[NestMorphism, NestMorphism]
     """
     flat_f, flat_g = random_divisible_Tuple_morphisms(
         min_length=min_length, max_length=max_length, min_value=min_value, max_value=max_value, nondegenerate=nondegenerate
@@ -647,8 +638,8 @@ def random_divisible_Nest_morphisms(min_length=2, max_length=9, min_value=2, max
     codomain_g = NestedTuple(domain_f.data)
     map_g = flat_g.map
     
-    f = Nest_morphism(domain_f, codomain_f, map_f)
-    g = Nest_morphism(domain_g, codomain_g, map_g)
+    f = NestMorphism(domain_f, codomain_f, map_f)
+    g = NestMorphism(domain_g, codomain_g, map_g)
     return f, g
 
 
@@ -663,7 +654,7 @@ def random_product_admissible_Nest_morphisms(min_length=2, max_length=9, min_val
     :param max_value: Maximum value for entries
     :type max_value: int
     :return: Pair of product-admissible morphisms
-    :rtype: Tuple[Nest_morphism, Nest_morphism]
+    :rtype: Tuple[NestMorphism, NestMorphism]
     """
     flat_f, flat_g = random_product_admissible_Tuple_morphisms(
         min_length=min_length, max_length=max_length, min_value=min_value, max_value=max_value, nondegenerate=nondegenerate
@@ -677,8 +668,8 @@ def random_product_admissible_Nest_morphisms(min_length=2, max_length=9, min_val
     codomain_g = NestedTuple(flat_g.codomain)
     map_g = flat_g.map
     
-    f = Nest_morphism(domain_f, codomain_f, map_f)
-    g = Nest_morphism(domain_g, codomain_g, map_g)
+    f = NestMorphism(domain_f, codomain_f, map_f)
+    g = NestMorphism(domain_g, codomain_g, map_g)
     return f, g
 
 
@@ -743,7 +734,7 @@ def random_weakly_composable_nest_morphisms():
     Generate a pair of weakly composable nested tuple morphisms.
     
     :return: Pair of weakly composable morphisms
-    :rtype: Tuple[Nest_morphism, Nest_morphism]
+    :rtype: Tuple[NestMorphism, NestMorphism]
     """
     T, U = random_mutually_refinable_nested_tuples()
     f = random_Nest_morphism(codomain=T, nondegenerate=True)

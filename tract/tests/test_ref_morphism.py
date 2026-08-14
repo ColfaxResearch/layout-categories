@@ -12,13 +12,16 @@ Run with: pytest tests/ref_morphism_tests.py
 import numpy as np
 import pytest
 
+from .conftest import seed_rngs
+
 from tract import (
-    Fact_morphism,
+    FactMorphism,
     NestedTuple,
-    Ref_morphism,
-    Tuple_morphism,
-    random_Tuple_morphism,
+    RefMorphism,
+    TupleMorphism,
 )
+
+from .generators import random_Tuple_morphism
 
 iterations = range(100)
 RANDOM_SEED_BASE = 42
@@ -57,7 +60,7 @@ def random_nest_over(entries, group_prob=0.6, max_depth=3):
     return tuple(result)
 
 
-def random_Ref_morphism(domain=None) -> Ref_morphism:
+def random_Ref_morphism(domain=None) -> RefMorphism:
     """
     Generate a random Ref morphism, optionally with prescribed domain (the
     flattening of its nested tuple).
@@ -65,12 +68,12 @@ def random_Ref_morphism(domain=None) -> Ref_morphism:
     :param domain: Domain tuple (optional)
     :type domain: Tuple[int] or None
     :return: Random Ref morphism
-    :rtype: Ref_morphism
+    :rtype: RefMorphism
     """
     if domain is None:
         length = int(np.random.randint(0, 7))
         domain = tuple(int(x) for x in np.random.randint(1, 10, length))
-    return Ref_morphism(NestedTuple(random_nest_over(domain)))
+    return RefMorphism(NestedTuple(random_nest_over(domain)))
 
 
 def random_composable_Ref_morphisms():
@@ -78,7 +81,7 @@ def random_composable_Ref_morphisms():
     Generate a random composable pair (f, g) with f.codomain == g.domain.
 
     :return: Composable pair of Ref morphisms
-    :rtype: tuple[Ref_morphism, Ref_morphism]
+    :rtype: tuple[RefMorphism, RefMorphism]
     """
     f = random_Ref_morphism()
     g = random_Ref_morphism(domain=f.codomain)
@@ -91,7 +94,7 @@ def random_composable_Ref_morphisms():
 
 
 class TestRefMorphismValidation:
-    """Tests for Ref_morphism construction and validation."""
+    """Tests for RefMorphism construction and validation."""
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_random_construction_is_valid(self, iteration):
@@ -102,7 +105,7 @@ class TestRefMorphismValidation:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
         assert f.domain == f.nest.flatten()
         assert f.codomain == tuple(
@@ -118,7 +121,7 @@ class TestRefMorphismValidation:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
         assert f.refined_codomain().refines(NestedTuple(f.codomain))
 
@@ -127,15 +130,15 @@ class TestRefMorphismValidation:
         Test that nonpositive entries are rejected.
         """
         with pytest.raises(ValueError, match="positive"):
-            Ref_morphism(NestedTuple((2, (0, 3))))
+            RefMorphism(NestedTuple((2, (0, 3))))
         with pytest.raises(ValueError, match="positive"):
-            Ref_morphism(NestedTuple((-1,)))
+            RefMorphism(NestedTuple((-1,)))
 
     def test_raw_data_is_wrapped(self):
         """
         Test that raw int/tuple data is accepted and wrapped.
         """
-        f = Ref_morphism(((2, 3), 4))
+        f = RefMorphism(((2, 3), 4))
         assert f.domain == (2, 3, 4)
         assert f.codomain == (6, 4)
 
@@ -143,7 +146,7 @@ class TestRefMorphismValidation:
         """
         Test that a bare-int nested tuple equals its singleton form.
         """
-        assert Ref_morphism(NestedTuple(5)) == Ref_morphism(NestedTuple((5,)))
+        assert RefMorphism(NestedTuple(5)) == RefMorphism(NestedTuple((5,)))
 
 
 class TestRefMorphismCategoryLaws:
@@ -157,9 +160,9 @@ class TestRefMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
-        identity = Ref_morphism.identity(f.codomain)
+        identity = RefMorphism.identity(f.codomain)
         assert identity.is_identity()
         assert identity.domain == identity.codomain == f.codomain
 
@@ -171,10 +174,10 @@ class TestRefMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
-        assert f.compose(Ref_morphism.identity(f.codomain)) == f
-        assert Ref_morphism.identity(f.domain).compose(f) == f
+        assert f.compose(RefMorphism.identity(f.codomain)) == f
+        assert RefMorphism.identity(f.domain).compose(f) == f
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_compose_domain_codomain(self, iteration):
@@ -184,7 +187,7 @@ class TestRefMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f, g = random_composable_Ref_morphisms()
         composite = f.compose(g)
         assert composite.domain == f.domain
@@ -198,7 +201,7 @@ class TestRefMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
         g = random_Ref_morphism()
         if f.codomain == g.domain:
@@ -215,7 +218,7 @@ class TestRefMorphismCategoryLaws:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f, g = random_composable_Ref_morphisms()
         h = random_Ref_morphism(domain=g.codomain)
         assert f.compose(g).compose(h) == f.compose(g.compose(h))
@@ -232,7 +235,7 @@ class TestRefMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
         g = random_Ref_morphism()
         s = f.sum(g)
@@ -247,7 +250,7 @@ class TestRefMorphismSum:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f, g = random_composable_Ref_morphisms()
         fprime, gprime = random_composable_Ref_morphisms()
         assert f.compose(g).sum(fprime.compose(gprime)) == f.sum(fprime).compose(
@@ -266,10 +269,10 @@ class TestRefFactBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f, g = random_composable_Ref_morphisms()
-        assert f.compose(g).to_Fact_morphism() == f.to_Fact_morphism().compose(
-            g.to_Fact_morphism()
+        assert f.compose(g).to_fact_morphism() == f.to_fact_morphism().compose(
+            g.to_fact_morphism()
         )
 
     @pytest.mark.parametrize("iteration", iterations)
@@ -281,29 +284,29 @@ class TestRefFactBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
-        fact = f.to_Fact_morphism()
+        fact = f.to_fact_morphism()
         assert fact.domain == f.domain
         assert fact.codomain == f.codomain
-        assert Ref_morphism.identity(f.codomain).to_Fact_morphism() == (
-            Fact_morphism.identity(f.codomain)
+        assert RefMorphism.identity(f.codomain).to_fact_morphism() == (
+            FactMorphism.identity(f.codomain)
         )
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_from_Fact_roundtrip(self, iteration):
         """
-        Test that from_Fact_morphism(f).to_Fact_morphism() == f, and that
+        Test that from_fact_morphism(f).to_fact_morphism() == f, and that
         the resulting Ref morphism has depth ≤ 2.
 
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
-        fact = f.to_Fact_morphism()
-        lifted = Ref_morphism.from_Fact_morphism(fact)
-        assert lifted.to_Fact_morphism() == fact
+        fact = f.to_fact_morphism()
+        lifted = RefMorphism.from_fact_morphism(fact)
+        assert lifted.to_fact_morphism() == fact
         assert lifted.nest.depth() <= 2
 
 
@@ -319,9 +322,9 @@ class TestRefMorphismNestedTupleBridge:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Ref_morphism()
-        rebuilt = Ref_morphism.from_refinement(
+        rebuilt = RefMorphism.from_refinement(
             f.refined_codomain(), NestedTuple(f.codomain)
         )
         assert rebuilt == f
@@ -330,26 +333,26 @@ class TestRefMorphismNestedTupleBridge:
     def test_from_refinement_allows_nested_relative_modes(self, iteration):
         """
         Test that from_refinement accepts refinements with nested relative
-        modes (which Fact_morphism.from_refinement rejects).
+        modes (which FactMorphism.from_refinement rejects).
 
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         refined = NestedTuple((((2, 3), 4), 5))
         coarse = NestedTuple((24, 5))
-        f = Ref_morphism.from_refinement(refined, coarse)
+        f = RefMorphism.from_refinement(refined, coarse)
         assert f.domain == (2, 3, 4, 5)
         assert f.codomain == (24, 5)
         with pytest.raises(ValueError, match="not flat"):
-            Fact_morphism.from_refinement(refined, coarse)
+            FactMorphism.from_refinement(refined, coarse)
 
     def test_from_refinement_rejects_non_flat_coarse(self):
         """
         Test that a non-flat coarse tuple is rejected.
         """
         with pytest.raises(ValueError, match="flat"):
-            Ref_morphism.from_refinement(
+            RefMorphism.from_refinement(
                 NestedTuple(((2, 3), 4)), NestedTuple(((6,), 4))
             )
 
@@ -366,15 +369,15 @@ class TestRefMorphismPullback:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         b = random_Ref_morphism()
         f = random_Tuple_morphism(codomain=b.codomain, max_value=10)
         refinement, pulled = b.pullback_with_refinement(f)
-        fact_refinement, fact_pulled = b.to_Fact_morphism().pullback_with_refinement(f)
+        fact_refinement, fact_pulled = b.to_fact_morphism().pullback_with_refinement(f)
         assert pulled.domain == fact_pulled.domain
         assert pulled.codomain == fact_pulled.codomain
         assert pulled.map == fact_pulled.map
-        assert refinement.to_Fact_morphism() == fact_refinement
+        assert refinement.to_fact_morphism() == fact_refinement
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_pullback_boundaries(self, iteration):
@@ -384,7 +387,7 @@ class TestRefMorphismPullback:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         b = random_Ref_morphism()
         f = random_Tuple_morphism(codomain=b.codomain, max_value=10)
         refinement, pulled = b.pullback_with_refinement(f)
@@ -400,9 +403,9 @@ class TestRefMorphismPullback:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Tuple_morphism(max_value=10)
-        identity = Ref_morphism.identity(f.codomain)
+        identity = RefMorphism.identity(f.codomain)
         refinement, pulled = identity.pullback_with_refinement(f)
         assert refinement.is_identity()
         assert pulled.domain == f.domain
@@ -413,8 +416,8 @@ class TestRefMorphismPullback:
         """
         Test that a codomain mismatch is rejected.
         """
-        b = Ref_morphism(NestedTuple(((2, 3),)))
-        g = Tuple_morphism((5,), (5,), (1,))
+        b = RefMorphism(NestedTuple(((2, 3),)))
+        g = TupleMorphism((5,), (5,), (1,))
         with pytest.raises(ValueError, match="[Cc]odomain"):
             b.pullback_with_refinement(g)
 
@@ -431,15 +434,15 @@ class TestRefMorphismPushforward:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         b = random_Ref_morphism()
         f = random_Tuple_morphism(domain=b.codomain, max_value=10)
         refinement, pushed = b.pushforward_with_refinement(f)
-        fact_refinement, fact_pushed = b.to_Fact_morphism().pushforward_with_refinement(f)
+        fact_refinement, fact_pushed = b.to_fact_morphism().pushforward_with_refinement(f)
         assert pushed.domain == fact_pushed.domain
         assert pushed.codomain == fact_pushed.codomain
         assert pushed.map == fact_pushed.map
-        assert refinement.to_Fact_morphism() == fact_refinement
+        assert refinement.to_fact_morphism() == fact_refinement
 
     @pytest.mark.parametrize("iteration", iterations)
     def test_pushforward_boundaries(self, iteration):
@@ -449,7 +452,7 @@ class TestRefMorphismPushforward:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         b = random_Ref_morphism()
         f = random_Tuple_morphism(domain=b.codomain, max_value=10)
         refinement, pushed = b.pushforward_with_refinement(f)
@@ -465,9 +468,9 @@ class TestRefMorphismPushforward:
         :param iteration: Test iteration number for seeding
         :type iteration: int
         """
-        np.random.seed(RANDOM_SEED_BASE + iteration)
+        seed_rngs(RANDOM_SEED_BASE + iteration)
         f = random_Tuple_morphism(max_value=10)
-        identity = Ref_morphism.identity(f.domain)
+        identity = RefMorphism.identity(f.domain)
         refinement, pushed = identity.pushforward_with_refinement(f)
         assert refinement.is_identity()
         assert pushed.domain == f.domain
@@ -478,8 +481,8 @@ class TestRefMorphismPushforward:
         """
         Test that a domain mismatch is rejected.
         """
-        b = Ref_morphism(NestedTuple(((2, 3),)))
-        g = Tuple_morphism((5,), (5,), (1,))
+        b = RefMorphism(NestedTuple(((2, 3),)))
+        g = TupleMorphism((5,), (5,), (1,))
         with pytest.raises(ValueError, match="[Dd]omain"):
             b.pushforward_with_refinement(g)
 
