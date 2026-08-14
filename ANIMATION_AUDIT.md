@@ -36,7 +36,7 @@ animations followed by the most substantial animation gaps.
 - [x] Prototype mutual refinement for flat tuples by splitting two
   factorizations into the refinements computed by `mutual_refinement()` and
   showing the resulting divisibility relation.
-  ([`TupleMutualRefinementTest`](visualization/scenes/tuple_mutual_refinement_test.py))
+  ([`TupleMorphismRefinementTest`](visualization/scenes/tuple_mutual_refinement_test.py))
 - [x] Animate the pullback of a flat tuple morphism along a refinement of its
   codomain, deforming "morphism then refinement" into "refinement then
   morphism", in two stages: the middle stack refines in place, giving parallel
@@ -46,13 +46,13 @@ animations followed by the most substantial animation gaps.
   modes, or send domain modes to the basepoint — and `pullback_along` supplies
   the picture. Six examples of increasing size.
   ([`TuplePullbackTest`](visualization/scenes/tuple_pullback_test.py),
-  [`pullback_along`](tract/src/tract/categories.py))
+  [`pullback_along`](tract/src/tract/tuple_morphism.py))
 - [x] Animate the pushforward of a flat tuple morphism along a refinement of
   its domain, as the exact mirror: the same two stages with the fixed
   refinement on the left, the same treatment of basepoints and unhit modes, and
   the same six examples.
   ([`TuplePushforwardTest`](visualization/scenes/tuple_pushforward_test.py),
-  [`pushforward_along`](tract/src/tract/categories.py))
+  [`pushforward_along`](tract/src/tract/tuple_morphism.py))
 - [x] Animate weak composition of flat tuple morphisms end to end: `f` and `g`
   open side by side and draw apart, their middle tuples grow the mutual
   refinement between them, both halves then refine and reorder at once — the
@@ -62,7 +62,7 @@ animations followed by the most substantial animation gaps.
   composite. Coalescence is deliberately omitted. Five examples of increasing
   size.
   ([`WeakCompositionTest`](visualization/scenes/weak_composition_test.py),
-  [`weak_composite`](tract/src/tract/layout_utils.py))
+  [`weak_composite`](tract/src/tract/refinement.py))
 - [x] Isolate the refinement gesture on its own — a stack of cells splitting in
   place, with the factors dealt out from under the cell they came from — as a
   bench for tuning it, running the same code the pullback and pushforward do.
@@ -80,7 +80,7 @@ animations followed by the most substantial animation gaps.
   height until its parent's band before bending. Depth-1 modes reduce exactly to the Fact
   fans. Five examples of increasing depth and width.
   ([`RefMorphismCreateTest`](visualization/scenes/ref_morphism_create_test.py),
-  [`Ref_morphism`](tract/src/tract/ref_morphism.py))
+  [`RefMorphism`](tract/src/tract/ref_morphism.py))
 - [x] Compose Ref morphisms by dissolving the middle stack (one connector per
   vanished cell) and collapsing stroke by stroke onto the grafted composite
   tree, matched through the graft's exact edge correspondence: a first-tree
@@ -94,7 +94,7 @@ animations followed by the most substantial animation gaps.
   Fact flattens it. Three examples: a Fact pair, a one-junction graft, and
   junctions on both sides.
   ([`RefMorphismCompositionTest`](visualization/scenes/ref_morphism_composition_test.py),
-  [`Ref_morphism.compose`](tract/src/tract/ref_morphism.py))
+  [`RefMorphism.compose`](tract/src/tract/ref_morphism.py))
 - [x] Compose spans in Span(Tuple, Ref): the Fact span scene's five-stack
   pullback gesture (the middle splits along b, blocks reorder into X′,
   then X and Y dissolve and the chain contracts), with the backward legs
@@ -106,7 +106,7 @@ animations followed by the most substantial animation gaps.
   composite backward leg. Two examples: the Fact span example lifted, and
   junctions on both legs with a junctioned mode surviving into b′.
   ([`RefSpanMorphismCompositionTest`](visualization/scenes/ref_span_composition_test.py),
-  [`RefSpan_morphism.compose`](tract/src/tract/ref_span.py))
+  [`RefSpanMorphism.compose`](tract/src/tract/ref_span.py))
 
 ## To do
 
@@ -115,80 +115,80 @@ animations followed by the most substantial animation gaps.
 - [ ] Animate the layout-to-morphism and morphism-to-layout correspondence,
   including tractability, flattening, and the round trip between a CuTe layout
   and its canonical morphism.
-  ([`is_tractable`](tract/src/tract/layout_utils.py),
-  [`compute_Tuple_morphism`](tract/src/tract/layout_utils.py),
-  [`compute_layout`](tract/src/tract/layout_utils.py),
-  [`compute_Nest_morphism`](tract/src/tract/layout_utils.py))
+  ([`is_tractable`](tract/src/tract/backends/pycute.py),
+  [`compute_Tuple_morphism`](tract/src/tract/backends/pycute.py),
+  [`compute_layout`](tract/src/tract/backends/pycute.py),
+  [`compute_Nest_morphism`](tract/src/tract/backends/pycute.py))
 
 ### High priority
 
 - [ ] Lift weak composition from flat tuples to nested ones: the flat animation
   refines and reorders stacks of cells, and the nested case needs the same
   steps drawn on trees.
-  ([`weak_composite`](tract/src/tract/layout_utils.py),
+  ([`weak_composite`](tract/src/tract/refinement.py),
   [`NestedTupleTree`](visualization/src/layout_categories_viz/nested_tuple.py))
 - [ ] Animate complements of morphisms: identify the unused codomain modes and
   construct the complementary morphism.
-  ([`Tuple_morphism.complement`](tract/src/tract/categories.py),
-  [`Nest_morphism.complement`](tract/src/tract/categories.py))
+  ([`TupleMorphism.complement`](tract/src/tract/tuple_morphism.py),
+  [`NestMorphism.complement`](tract/src/tract/nest_morphism.py))
 - [ ] Animate logical division and logical product, including the complement
   and concatenation steps from which they are built.
-  ([`flat_divide`](tract/src/tract/categories.py),
-  [`flat_product`](tract/src/tract/categories.py),
-  [`logical_divide`](tract/src/tract/categories.py),
-  [`logical_product`](tract/src/tract/categories.py))
+  ([`flat_divide`](tract/src/tract/tuple_morphism.py),
+  [`flat_product`](tract/src/tract/tuple_morphism.py),
+  [`logical_divide`](tract/src/tract/tuple_morphism.py),
+  [`logical_product`](tract/src/tract/tuple_morphism.py))
 - [ ] Animate sums/concatenations of morphisms with disjoint images, including
   the resulting nested source structure and wedge-like map.
-  ([`Tuple_morphism.sum`](tract/src/tract/categories.py),
-  [`Tuple_morphism.concat`](tract/src/tract/categories.py),
-  [`Nest_morphism.concat`](tract/src/tract/categories.py))
+  ([`TupleMorphism.sum`](tract/src/tract/tuple_morphism.py),
+  [`TupleMorphism.concat`](tract/src/tract/tuple_morphism.py),
+  [`NestMorphism.concat`](tract/src/tract/nest_morphism.py))
 
 ### Medium priority
 
 - [ ] Animate standalone nested-morphism coalescence and the distinction
   between nested-tree cancellation during composition and
-  `Nest_morphism.coalesce()`.
-  ([`Nest_morphism.coalesce`](tract/src/tract/categories.py))
+  `NestMorphism.coalesce()`.
+  ([`NestMorphism.coalesce`](tract/src/tract/nest_morphism.py))
 - [ ] Animate flattening only the codomain of a nested morphism.
-  ([`flatten_codomain`](tract/src/tract/categories.py))
+  ([`flatten_codomain`](tract/src/tract/tuple_morphism.py))
 - [ ] Animate tuple sorting and the resulting reordering morphism.
-  ([`sort`](tract/src/tract/categories.py))
+  ([`sort`](tract/src/tract/tuple_morphism.py))
 - [ ] Animate squeezing away unit modes, then factorization through a selected
   codomain subtuple.
-  ([`squeeze`](tract/src/tract/categories.py),
-  [`factorize`](tract/src/tract/categories.py))
+  ([`squeeze`](tract/src/tract/tuple_morphism.py),
+  [`factorize`](tract/src/tract/tuple_morphism.py))
 - [ ] Add a separate strong-coalescence animation, showing how it differs from
   the currently animated weak coalescence.
-  ([`strong_coalesce`](tract/src/tract/categories.py))
+  ([`strong_coalesce`](tract/src/tract/tuple_morphism.py))
 - [ ] Animate nested-tuple refinement primitives such as profiles, relative
   modes, and relative flattening.
-  ([`profile`](tract/src/tract/categories.py),
-  [`refines`](tract/src/tract/categories.py),
-  [`relative_mode`](tract/src/tract/categories.py),
-  [`relative_flattening`](tract/src/tract/categories.py))
+  ([`profile`](tract/src/tract/tuple_morphism.py),
+  [`refines`](tract/src/tract/tuple_morphism.py),
+  [`relative_mode`](tract/src/tract/tuple_morphism.py),
+  [`relative_flattening`](tract/src/tract/tuple_morphism.py))
 
 ### Lower priority
 
 - [ ] Animate flat and nested layout concatenation.
-  ([`flat_concatenate`](tract/src/tract/layout_utils.py),
-  [`concatenate`](tract/src/tract/layout_utils.py))
+  ([`flat_concatenate`](tract/src/tract/backends/pycute.py),
+  [`concatenate`](tract/src/tract/backends/pycute.py))
 - [ ] Animate layout flattening, stride sorting, and nullification of trivial
   or zero strides.
-  ([`flatten_layout`](tract/src/tract/layout_utils.py),
-  [`sort_flat_layout`](tract/src/tract/layout_utils.py),
-  [`nullify_trivial_strides`](tract/src/tract/layout_utils.py),
-  [`nullify_zero_strides`](tract/src/tract/layout_utils.py))
+  ([`flatten_layout`](tract/src/tract/backends/pycute.py),
+  [`sort_flat_layout`](tract/src/tract/backends/pycute.py),
+  [`nullify_trivial_strides`](tract/src/tract/backends/pycute.py),
+  [`nullify_zero_strides`](tract/src/tract/backends/pycute.py))
 - [ ] Animate flat-layout complementation with respect to a total size.
-  ([`flat_complement`](tract/src/tract/layout_utils.py))
-- [ ] Add a standalone visualization of the foundational `Fin_morphism`
+  ([`flat_complement`](tract/src/tract/backends/pycute.py))
+- [ ] Add a standalone visualization of the foundational `FinMorphism`
   operations (`compose`, `sum`, and `wedge`) that underlie the tuple and nest
   categories.
-  ([`Fin_morphism`](tract/src/tract/categories.py))
+  ([`FinMorphism`](tract/src/tract/fin.py))
 - [ ] Animate TikZ generation/export as a presentation endpoint for nested
   morphisms, layouts, and mutual refinements. Static TikZ/image examples exist,
   but there is no Manim animation for the export process.
-  ([`to_tikz`](tract/src/tract/categories.py),
-  [`layout_to_tikz`](tract/src/tract/layout_utils.py))
+  ([`to_tikz`](tract/src/tract/tuple_morphism.py),
+  [`layout_to_tikz`](tract/src/tract/backends/pycute.py))
 
 ## Prototypes
 
@@ -196,7 +196,7 @@ Not animations of the library, but experiments in how these scenes could look.
 
 - Two decorative variations tried on one figure: a hue per mode threaded
   through a refinement, and a paper shadow under every cell.
-  ([`DecorativeVariationsTest`](visualization/scenes/decorative_variations_test.py))
+  ([`DecorativeVariationsTest`](visualization/scenes/prototypes/decorative_variations_test.py))
 - Drawing connectors in graphite rather than ink: a wavering path, pressure
   varying along the stroke, and two passes plus a bloom, drawn start to end.
-  ([`GraphiteLineTest`](visualization/scenes/graphite_line_test.py))
+  ([`GraphiteLineTest`](visualization/scenes/prototypes/graphite_line_test.py))
