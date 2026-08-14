@@ -44,9 +44,40 @@ from .categories import (
     morphism_to_tikz,
 )
 
+# The category Fact (kept in a separate module for now)
+from .fact_morphism import (
+    Fact_morphism,
+)
+
+# The category Ref (kept in a separate module for now)
+from .ref_morphism import (
+    Ref_morphism,
+)
+
+# The category Span (kept in a separate module for now)
+from .span import (
+    Span_morphism,
+)
+
+# The category Span(Tuple, Ref) (kept in a separate module for now)
+from .ref_span import (
+    RefSpan_morphism,
+)
+
+# The category CoSpan (kept in a separate module for now)
+from .cospan import (
+    CoSpan_morphism,
+)
+
+# The category CoSpan(Tuple, Ref) (kept in a separate module for now)
+from .ref_cospan import (
+    RefCoSpan_morphism,
+)
+
 # Layout computation functions
 from .layout_utils import (
     compute_flat_layout,
+    compute_flat_layout_components,
     compute_layout,
     compute_Tuple_morphism,
     compute_Nest_morphism,
@@ -105,9 +136,28 @@ __all__ = [
     "logical_divide",
     "logical_product",
     "morphism_to_tikz",
-    
+
+    # The category Fact
+    "Fact_morphism",
+
+    # The category Ref
+    "Ref_morphism",
+
+    # The category Span
+    "Span_morphism",
+
+    # The category Span(Tuple, Ref)
+    "RefSpan_morphism",
+
+    # The category CoSpan(Tuple, Ref)
+    "RefCoSpan_morphism",
+
+    # The category CoSpan
+    "CoSpan_morphism",
+
     # Layout computation functions
     "compute_flat_layout",
+    "compute_flat_layout_components",
     "compute_layout",
     "compute_Tuple_morphism",
     "compute_Nest_morphism",

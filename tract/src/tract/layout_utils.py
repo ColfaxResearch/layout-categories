@@ -202,14 +202,13 @@ def compute_Tuple_morphism(flat_layout: cute.Layout) -> Tuple_morphism:
         raise ValueError("The provided layout is not tractable.")
 
 
-def compute_flat_layout(morphism: Tuple_morphism) -> cute.Layout:
-    """
-    Compute the layout L_f associated to a tuple morphism f.
-    
-    :param morphism: Input tuple morphism
-    :type morphism: Tuple_morphism
-    :return: Corresponding layout
-    :rtype: cute.Layout
+def compute_flat_layout_components(
+    morphism: Tuple_morphism,
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Return the ``(shape, stride)`` pair associated to a tuple morphism.
+
+    This is the pure-Python core of :func:`compute_flat_layout`, useful when
+    the concrete CuTe layout object is not required.
     """
     domain = morphism.domain
     codomain = morphism.codomain
@@ -227,8 +226,19 @@ def compute_flat_layout(morphism: Tuple_morphism) -> cute.Layout:
                 raise OverflowError("Stride value exceeds 32-bit integer limit.")
             stride_list[i] = t
 
-    shape_tuple = tuple(domain)
-    stride_tuple = tuple(stride_list)
+    return tuple(domain), tuple(stride_list)
+
+
+def compute_flat_layout(morphism: Tuple_morphism) -> cute.Layout:
+    """
+    Compute the layout L_f associated to a tuple morphism f.
+    
+    :param morphism: Input tuple morphism
+    :type morphism: Tuple_morphism
+    :return: Corresponding layout
+    :rtype: cute.Layout
+    """
+    shape_tuple, stride_tuple = compute_flat_layout_components(morphism)
     return cute.make_layout(shape_tuple, stride=stride_tuple)
 
 
