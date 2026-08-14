@@ -552,7 +552,7 @@ class WeakCompositionTest(LayoutScene):
         self.play(
             ShrinkToCenter(VGroup(*w_cells)),
             *(UndrawMapstoTip(left["tips"][leaf]) for leaf in routes),
-            *(Create(bridge) for bridge in bridges),
+            *(Create(bridge_line) for bridge_line in bridges),
             *(FadeOut(group) for group in stray),
             run_time=1.0,
         )
@@ -563,9 +563,9 @@ class WeakCompositionTest(LayoutScene):
         right_shift = np.array((X_W + COMPOSITE_HALF_WIDTH - X_U, 0.0, 0.0))
         curved = VGroup()
         contracted = VGroup()
-        for leaf, bridge in zip(routes, bridges):
+        for leaf, bridge_line in zip(routes, bridges):
             route = join_route(
-                left["inner"][leaf], bridge, right["inner"][leaf]
+                left["inner"][leaf], bridge_line, right["inner"][leaf]
             )
             arrow = stacks.segment_arrow(
                 left["cells"][leaf].copy().shift(left_shift),
