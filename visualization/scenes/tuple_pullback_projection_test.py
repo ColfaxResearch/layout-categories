@@ -20,7 +20,6 @@ of the modes that survive.  Every codomain mode is hit, so nothing else is going
 on.
 """
 
-from layout_categories_viz.style import BACKGROUND
 from scenes.tuple_pullback_test import PullbackExample, TuplePullbackTest
 
 
@@ -46,7 +45,6 @@ class TuplePullbackProjectionTest(TuplePullbackTest):
     """Pull back a morphism that projects some domain modes away."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._show_pullback(example)
-            self._clear_scene(last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)

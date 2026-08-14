@@ -21,6 +21,8 @@ segments, which converge on a cell sharing their closing run, exactly as tree
 edges share their root-side endpoint.
 """
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 from math import prod
 
@@ -32,31 +34,30 @@ from manim import (
     LaggedStart,
     LEFT,
     RIGHT,
-    Scene,
     ShrinkToCenter,
     Text,
     Transform,
     VGroup,
     Write,
 )
-from tract import Fact_morphism
+from tract import FactMorphism
 
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 # The composition scene owns the route-surgery helpers and the pullback scene
 # owns the drawing primitives, so this scene cannot drift from either family.
-from scenes.tuple_morphism_composition_curve import (
-    _matched_path_pair,
-    _three_segment_route,
+from layout_categories_viz.paths import (
+    matched_path_pair,
+    three_segment_route,
 )
-from scenes.tuple_pullback_test import (
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import (
     CELL_H,
     LEFT_X,
     MID_X,
     RIGHT_X,
     SLOT_STEP,
     STROKE_WIDTH,
-    TuplePullbackTest,
 )
 
 LABEL_BUFF = 0.55
@@ -74,8 +75,8 @@ class FactCompositionExample:
         first_domain = tuple(x for mode in self.first_modes for x in mode)
         middle = tuple(prod(mode) for mode in self.first_modes)
         target = tuple(prod(mode) for mode in self.second_modes)
-        f = Fact_morphism(first_domain, middle, self.first_modes)
-        g = Fact_morphism(middle, target, self.second_modes)
+        f = FactMorphism(first_domain, middle, self.first_modes)
+        g = FactMorphism(middle, target, self.second_modes)
         return f, g
 
 
@@ -91,12 +92,11 @@ EXAMPLES = (
 )
 
 
-class FactMorphismCompositionTest(Scene):
+class FactMorphismCompositionTest(LayoutScene):
     def construct(self):
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._play_example(example)
-            TuplePullbackTest._clear_scene(self, last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _play_example(self, example: FactCompositionExample) -> None:
         f, g = example.morphisms()
@@ -118,7 +118,7 @@ class FactMorphismCompositionTest(Scene):
         def column(values, x):
             return VGroup(
                 *(
-                    TuplePullbackTest._cell(
+                    stacks.cell(
                         value, np.array([x, baseline + i * SLOT_STEP, 0.0])
                     )
                     for i, value in enumerate(values)
@@ -134,7 +134,7 @@ class FactMorphismCompositionTest(Scene):
         # fan the way tree edges share their root-side endpoint.
         first_segments = VGroup(
             *(
-                TuplePullbackTest._tree_segment(
+                stacks.tree_segment(
                     source_cells[i].get_right(), middle_cells[j].get_left()
                 )
                 for i, j in enumerate(middle_of_domain)
@@ -142,7 +142,7 @@ class FactMorphismCompositionTest(Scene):
         )
         second_segments = VGroup(
             *(
-                TuplePullbackTest._tree_segment(
+                stacks.tree_segment(
                     middle_cells[j].get_right(), target_cells[k].get_left()
                 )
                 for j, k in enumerate(target_of_middle)
@@ -229,13 +229,13 @@ class FactMorphismCompositionTest(Scene):
         initial_routes = VGroup()
         final_routes = VGroup()
         for i, (first_segment, connector, continuation) in enumerate(routes):
-            glued = _three_segment_route(first_segment, connector, continuation)
+            glued = three_segment_route(first_segment, connector, continuation)
             k = target_of_middle[middle_of_domain[i]]
-            final_segment = TuplePullbackTest._tree_segment(
+            final_segment = stacks.tree_segment(
                 source_cells[i].get_right() + source_shift,
                 target_cells[k].get_left() + target_shift,
             )
-            initial, final = _matched_path_pair(glued, final_segment)
+            initial, final = matched_path_pair(glued, final_segment)
             initial_routes.add(initial)
             final_routes.add(final)
 

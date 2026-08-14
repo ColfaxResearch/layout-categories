@@ -1,5 +1,7 @@
 """Compose Nest morphisms by cancelling their common nested tuple tree."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 
 import numpy as np
@@ -9,7 +11,6 @@ from manim import (
     FadeIn,
     FadeOut,
     LaggedStart,
-    Scene,
     ShrinkToCenter,
     Text,
     Transform,
@@ -19,16 +20,16 @@ from manim import (
     config,
     smooth,
 )
-from tract import Nest_morphism
+from tract import NestMorphism
 
 from layout_categories_viz import NestMorphismDiagram, TailToTipMapsto
 from layout_categories_viz.animations import UncreateMapstoTip
 from layout_categories_viz.coalesce import interpolate_mapsto_arrow
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 from layout_categories_viz.tuple_morphism import TupleMorphismDiagram
-from scenes.tuple_morphism_composition_curve import (
-    _matched_path_pair,
-    _three_segment_route,
+from layout_categories_viz.paths import (
+    matched_path_pair,
+    three_segment_route,
 )
 from scenes.nest_tree_cancellation_test import (
     SimplifiedNestTreeCancellationTest,
@@ -76,11 +77,10 @@ FIRST_MAPPING = EXAMPLES[1].first_mapping
 SECOND_MAPPING = EXAMPLES[1].second_mapping
 
 
-class NestMorphismCompositionTest(Scene):
+class NestMorphismCompositionTest(LayoutScene):
     """Overlap and cancel equal middle trees, leaving the composite."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         frame_height = config.frame_height
         cell_size = 0.074 * frame_height
         diagram_options = dict(
@@ -176,7 +176,7 @@ class NestMorphismCompositionTest(Scene):
 
         aligned_second_arrows = []
         for source_index, target_index in enumerate(SECOND_MAPPING):
-            arrow = TupleMorphismDiagram._mapsto_arrow(
+            arrow = TupleMorphismDiagram.mapsto_arrow(
                 first.target_tree.leaf_entries[source_index].get_right(),
                 second.target_tree.leaf_entries[target_index - 1].get_left(),
                 endpoint_inset=0.08 * scale_factor,
@@ -226,10 +226,10 @@ class NestMorphismCompositionTest(Scene):
         self.play(*overlap_animations, run_time=1.35)
         self.wait(0.55)
 
-        first_morphism = Nest_morphism(
+        first_morphism = NestMorphism(
             DOMAIN, INTERMEDIATE, FIRST_MAPPING
         )
-        second_morphism = Nest_morphism(
+        second_morphism = NestMorphism(
             INTERMEDIATE, CODOMAIN, SECOND_MAPPING
         )
         composite = first_morphism.compose(second_morphism)
@@ -237,7 +237,7 @@ class NestMorphismCompositionTest(Scene):
         for source_index, target_index in enumerate(composite.map):
             if target_index == 0:
                 continue
-            arrow = TupleMorphismDiagram._mapsto_arrow(
+            arrow = TupleMorphismDiagram.mapsto_arrow(
                 first.source_tree.leaf_entries[source_index].get_right(),
                 second.target_tree.leaf_entries[target_index - 1].get_left(),
                 endpoint_inset=0.08 * scale_factor,
@@ -324,7 +324,6 @@ class NestMorphismCancellationCompositionTest(
         )
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
 
         for example in EXAMPLES:
             self._show_example(example)
@@ -451,7 +450,7 @@ class NestMorphismCancellationCompositionTest(
                 range(len(example.first_mapping)),
                 example.first_mapping,
             ):
-                destination = TupleMorphismDiagram._mapsto_arrow(
+                destination = TupleMorphismDiagram.mapsto_arrow(
                     first.source_tree.leaf_entries[source_index].get_right()
                     + left_shift,
                     first.target_tree.leaf_entries[
@@ -469,7 +468,7 @@ class NestMorphismCancellationCompositionTest(
                 range(len(example.second_mapping)),
                 example.second_mapping,
             ):
-                destination = TupleMorphismDiagram._mapsto_arrow(
+                destination = TupleMorphismDiagram.mapsto_arrow(
                     second.source_tree.leaf_entries[
                         source_index
                     ].get_right()
@@ -642,12 +641,12 @@ class NestMorphismCancellationCompositionTest(
             source_index,
             target_index,
         ), connector in zip(routes, connectors):
-            route_shaft = _three_segment_route(
+            route_shaft = three_segment_route(
                 first_arrow.shaft,
                 connector,
                 second_arrow.shaft,
             )
-            contracted = TupleMorphismDiagram._mapsto_arrow(
+            contracted = TupleMorphismDiagram.mapsto_arrow(
                 first.source_tree.leaf_entries[source_index].get_right()
                 + source_shift,
                 second.target_tree.leaf_entries[target_index].get_left()
@@ -655,7 +654,7 @@ class NestMorphismCancellationCompositionTest(
                 **scaled_arrow_options,
             )
             contracted.tail.set_opacity(0)
-            initial_shaft, final_shaft = _matched_path_pair(
+            initial_shaft, final_shaft = matched_path_pair(
                 route_shaft,
                 contracted.shaft,
             )

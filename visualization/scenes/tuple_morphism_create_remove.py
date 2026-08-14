@@ -1,5 +1,7 @@
 """Create and remove a small gallery of tuple morphisms."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 
 from manim import (
@@ -8,7 +10,6 @@ from manim import (
     FadeOut,
     LaggedStart,
     ORIGIN,
-    Scene,
     Text,
     VGroup,
     config,
@@ -19,7 +20,7 @@ from layout_categories_viz import (
     TipToTailUnmapsto,
     TupleMorphismDiagram,
 )
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 
 # Arrow-shape tuning knobs.  Increasing HORIZONTAL_RUN keeps each curve
@@ -63,11 +64,10 @@ EXAMPLES = (
 )
 
 
-class TupleMorphismCreateRemove(Scene):
+class TupleMorphismCreateRemove(LayoutScene):
     """Construct each tuple morphism, pause, and erase it again."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
 
         for example in EXAMPLES:
             self._show_example(example)

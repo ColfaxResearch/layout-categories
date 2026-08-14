@@ -9,7 +9,6 @@ pullback looks when ``f`` is not order preserving.
     S' = ((2, 4), (4, 2))             f' over (3, 4, 1, 2)
 """
 
-from layout_categories_viz.style import BACKGROUND
 from scenes.tuple_pullback_test import PullbackExample, TuplePullbackTest
 
 
@@ -25,7 +24,6 @@ class TuplePullbackTranspositionTest(TuplePullbackTest):
     """Pull a mode-reordering morphism back along a refinement."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._show_pullback(example)
-            self._clear_scene(last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)

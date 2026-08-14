@@ -20,39 +20,39 @@ to make the same statement more pleasant to look at.
    clear -- so the deck looks like a deck.
 """
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from math import prod
 
 import numpy as np
 from manim import (
     DOWN,
     FadeIn,
-    FadeOut,
     RIGHT,
-    Scene,
     Text,
     ValueTracker,
     interpolate_color,
     smooth,
 )
-from tract import NestedTuple, Nest_morphism
+from tract import NestedTuple, NestMorphism
 
 from layout_categories_viz.animations import DrawMapstoTip, UndrawMapstoTip
 
 from layout_categories_viz.style import (
-    BACKGROUND,
     CODE_FONT,
     INK,
     MODE_COLORS,
     PANEL,
 )
-from scenes.tuple_pullback_test import (
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import (
+    make_place,
     ARROW_INSET,
     LEFT_X,
     MID_X,
     RIGHT_X,
     SLOT_STEP,
-    TuplePullbackTest,
-    _groups,
+    leaf_groups,
 )
 
 
@@ -72,11 +72,10 @@ def _hue(mode: int):
     return MODE_COLORS[mode % len(MODE_COLORS)]
 
 
-class DecorativeVariationsTest(Scene):
+class DecorativeVariationsTest(LayoutScene):
     """Plain, then coloured, then coloured and shadowed."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         variations = (
             ("as it is drawn now", False, False),
             ("a hue per mode, threaded through the refinement", True, False),
@@ -84,7 +83,7 @@ class DecorativeVariationsTest(Scene):
         )
         for index, (caption, colour, shadow) in enumerate(variations):
             self._show(caption=caption, colour=colour, shadow=shadow)
-            self._clear_scene(last=index == len(variations) - 1)
+            self.clear_scene(last=index == len(variations) - 1)
 
     def _show(self, *, caption: str, colour: bool, shadow: bool) -> None:
         T = NestedTuple(tuple(prod(factors) for factors in MODES))
@@ -95,18 +94,17 @@ class DecorativeVariationsTest(Scene):
             )
         )
         S = NestedTuple(T.data)
-        Nest_morphism(S, T, MAPPING)  # validates the figure
-        groups = _groups(Tprime, T)
+        NestMorphism(S, T, MAPPING)  # validates the figure
+        groups = leaf_groups(Tprime, T)
         owner = {leaf: mode for mode, leaves in enumerate(groups) for leaf in leaves}
         values = Tprime.flatten()
 
         baseline = -((Tprime.length() - 1) * SLOT_STEP) / 2
 
-        def place(column, index):
-            return np.array((column, baseline + index * SLOT_STEP, 0.0))
+        place = make_place(baseline, SLOT_STEP)
 
         def cell(value, center, mode):
-            drawn = TuplePullbackTest._cell(value, center)
+            drawn = stacks.cell(value, center)
             if colour:
                 box = drawn[0]
                 box.set_fill(
@@ -119,9 +117,9 @@ class DecorativeVariationsTest(Scene):
 
         def connector(start, end, mode, *, arrow=False):
             drawn = (
-                TuplePullbackTest._segment_arrow(start, end)
+                stacks.segment_arrow(start, end)
                 if arrow
-                else TuplePullbackTest._tree_segment(
+                else stacks.tree_segment(
                     start.get_right(), end.get_left()
                 )
             )
@@ -213,19 +211,19 @@ class DecorativeVariationsTest(Scene):
                     carried = cell(T.entry(mode + 1), start, mode)[1]
                     split[1].set_opacity(0)
                     split.add(carried)
-                TuplePullbackTest._split(
+                stacks.split_cell(
                     split, alpha, start, place(MID_X, leaf), peeled=bool(index)
                 )
                 splits[leaf] = split
 
         fans = {
-            leaf: TuplePullbackTest._attached(
+            leaf: stacks.attached(
                 s_cells[owner[leaf]], splits[leaf]
             )
             for leaf in splits
         }
         arrows = {
-            leaf: TuplePullbackTest._attached(splits[leaf], tp_cells[leaf])
+            leaf: stacks.attached(splits[leaf], tp_cells[leaf])
             for leaf in splits
         }
         if colour:
@@ -236,7 +234,7 @@ class DecorativeVariationsTest(Scene):
 
         self.remove(*f_arrows, *refinement, *t_cells)
         self.add(*fans.values(), *arrows.values())
-        for drawn in TuplePullbackTest._deck(splits):
+        for drawn in stacks.deck(splits):
             show(drawn)
 
         self.play(
@@ -247,7 +245,7 @@ class DecorativeVariationsTest(Scene):
 
         # The connectors on the right are parallel now, so they take their tips.
         tips = {
-            leaf: TuplePullbackTest._arrow_tip(
+            leaf: stacks.arrow_tip(
                 tp_cells[leaf].get_left() - RIGHT * ARROW_INSET
             )
             for leaf in splits
@@ -263,8 +261,3 @@ class DecorativeVariationsTest(Scene):
         )
         self.wait(1.8)
 
-    def _clear_scene(self, *, last) -> None:
-        self.play(*(FadeOut(m) for m in self.mobjects), run_time=0.6)
-        self.clear()
-        if not last:
-            self.wait(0.2)

@@ -1,5 +1,7 @@
 """Compare left-to-right and right-to-left nested-tuple tree drawings."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from manim import (
     Create,
     DOWN,
@@ -8,14 +10,13 @@ from manim import (
     LaggedStart,
     LEFT,
     RIGHT,
-    Scene,
     Text,
     UP,
     VGroup,
 )
 
 from layout_categories_viz import NestedTupleTree
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 
 EXAMPLES = (
@@ -30,11 +31,10 @@ def _format_nested_tuple(value):
     return "(" + ", ".join(_format_nested_tuple(item) for item in value) + ")"
 
 
-class NestedTupleTreeTest(Scene):
+class NestedTupleTreeTest(LayoutScene):
     """Create mirrored nested-tuple forests for source and target use."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for example in EXAMPLES:
             self._show_example(example)
 

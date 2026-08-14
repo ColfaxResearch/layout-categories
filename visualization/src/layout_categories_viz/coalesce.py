@@ -1,13 +1,39 @@
 """Reusable geometry for local tuple-morphism coalesce gestures."""
 
 import numpy as np
-from manim import Line, UP, VGroup, VMobject
+from manim import (
+    GrowFromCenter,
+    LaggedStart,
+    Line,
+    ORIGIN,
+    ReplacementTransform,
+    Transform,
+    Uncreate,
+    UP,
+    UpdateFromAlphaFunc,
+    VGroup,
+    VMobject,
+    smooth,
+)
 
+from .paths import (
+    ARROW_BEND_HANDLE,
+    ARROW_ENDPOINT_INSET,
+    ARROW_HORIZONTAL_RUN,
+)
 from .style import INK
 from .tuple_morphism import TupleMorphismDiagram
 
 
 CELL_CORNER_RADIUS = 0.08
+
+CORRESPONDENCE_LINE_COUNT = 11
+CORRESPONDENCE_LINE_WIDTH = 1.25
+CORRESPONDENCE_LINE_OPACITY = 0.42
+CORRESPONDENCE_DRAW_RUN_TIME = 0.65
+CORRESPONDENCE_DRAW_LAG_RATIO = 0.055
+CORRESPONDENCE_PULL_RUN_TIME = 1.15
+CORRESPONDENCE_ENDPOINT_MARGIN = 0.06
 
 
 def selective_corner_box(
@@ -134,168 +160,6 @@ def cell_weld_seams(entries, center):
     )
 
 
-def _smoothstep(value):
-    value = np.clip(value, 0.0, 1.0)
-    return value * value * (3.0 - 2.0 * value)
-
-
-def zipper_progress(alpha, path_position, *, transition_width):
-    """Return progress behind a soft source-to-target zipper front."""
-    front = -transition_width + alpha * (1.0 + 2.0 * transition_width)
-    return _smoothstep(
-        (front - path_position + transition_width)
-        / (2.0 * transition_width)
-    )
-
-
-def _sample_shaft_y(shaft, x_coordinates):
-    """Sample a monotone-x Bézier shaft as y(x)."""
-    samples = []
-    for curve in shaft.points.reshape((-1, 4, 3)):
-        start, first_handle, second_handle, end = curve
-        for parameter in np.linspace(0.0, 1.0, 33, endpoint=False):
-            complement = 1.0 - parameter
-            samples.append(
-                complement**3 * start
-                + 3.0 * complement**2 * parameter * first_handle
-                + 3.0 * complement * parameter**2 * second_handle
-                + parameter**3 * end
-            )
-    samples.append(shaft.points[-1])
-    samples = np.asarray(samples)
-    order = np.argsort(samples[:, 0])
-    return np.interp(x_coordinates, samples[order, 0], samples[order, 1])
-
-
-def zipper_arrow(
-    source_anchor,
-    target_anchor,
-    initial_source_y,
-    initial_target_y,
-    center_source_y,
-    center_target_y,
-    alpha,
-    *,
-    transition_width,
-    sample_count,
-    endpoint_inset,
-    horizontal_run,
-    bend_handle,
-):
-    """Return one frame of a continuous tail-to-tip arrow collapse.
-
-    Parallel arrows differ from their product arrow by a vertical translation,
-    including when the arrows are diagonal.  The zipper applies that translation
-    behind a smoothly moving junction while retaining exact horizontal runs at
-    the source and target cells.
-    """
-    start = np.asarray((source_anchor[0], initial_source_y, 0.0))
-    end = np.asarray((target_anchor[0], initial_target_y, 0.0))
-    arrow = TupleMorphismDiagram._mapsto_arrow(
-        start,
-        end,
-        endpoint_inset=endpoint_inset,
-        horizontal_run=horizontal_run,
-        bend_handle=bend_handle,
-    )
-    arrow.tail.set_opacity(0)
-
-    source_delta = center_source_y - initial_source_y
-    target_delta = center_target_y - initial_target_y
-    if not np.isclose(source_delta, target_delta):
-        raise ValueError("zipper collapse requires vertically parallel arrows")
-    vertical_delta = (source_delta + target_delta) / 2.0
-
-    start_x = arrow.shaft.get_start()[0]
-    end_x = arrow.shaft.get_end()[0]
-    span = end_x - start_x
-    flat_fraction = min(0.45, horizontal_run / abs(span))
-    normalized = np.unique(
-        np.concatenate(
-            (
-                np.linspace(0.0, 1.0, sample_count + 1),
-                np.asarray((flat_fraction, 1.0 - flat_fraction)),
-            )
-        )
-    )
-    interior = np.clip(
-        (normalized - flat_fraction) / (1.0 - 2.0 * flat_fraction),
-        0.0,
-        1.0,
-    )
-    path_position = _smoothstep(interior)
-    path_derivative = np.where(
-        (normalized > flat_fraction)
-        & (normalized < 1.0 - flat_fraction),
-        6.0
-        * interior
-        * (1.0 - interior)
-        / (1.0 - 2.0 * flat_fraction),
-        0.0,
-    )
-
-    front = -transition_width + alpha * (1.0 + 2.0 * transition_width)
-    transition = np.clip(
-        (front - path_position + transition_width)
-        / (2.0 * transition_width),
-        0.0,
-        1.0,
-    )
-    local_progress = _smoothstep(transition)
-    transition_derivative = 6.0 * transition * (1.0 - transition)
-
-    x_coordinates = start_x + normalized * span
-    base_y = _sample_shaft_y(arrow.shaft, x_coordinates)
-    base_slopes = np.gradient(base_y, x_coordinates)
-    base_slopes[
-        (normalized <= flat_fraction)
-        | (normalized >= 1.0 - flat_fraction)
-    ] = 0.0
-    zipper_slopes = (
-        vertical_delta
-        * transition_derivative
-        * (-1.0 / (2.0 * transition_width))
-        * path_derivative
-        / span
-    )
-    y_coordinates = base_y + local_progress * vertical_delta
-    slopes = base_slopes + zipper_slopes
-
-    shaft = VMobject(stroke_color=INK, stroke_width=3.6)
-    shaft.start_new_path(
-        np.asarray((x_coordinates[0], y_coordinates[0], 0.0))
-    )
-    for index in range(len(normalized) - 1):
-        start_point = np.asarray(
-            (x_coordinates[index], y_coordinates[index], 0.0)
-        )
-        end_point = np.asarray(
-            (x_coordinates[index + 1], y_coordinates[index + 1], 0.0)
-        )
-        delta_x = end_point[0] - start_point[0]
-        first_handle = start_point + np.asarray(
-            (delta_x / 3.0, slopes[index] * delta_x / 3.0, 0.0)
-        )
-        second_handle = end_point - np.asarray(
-            (delta_x / 3.0, slopes[index + 1] * delta_x / 3.0, 0.0)
-        )
-        shaft.add_cubic_bezier_curve_to(first_handle, second_handle, end_point)
-
-    arrow.submobjects[1] = shaft
-    arrow.shaft = shaft
-    arrow.tail.shift(
-        UP
-        * vertical_delta
-        * zipper_progress(alpha, 0.0, transition_width=transition_width)
-    )
-    arrow.tip.shift(
-        UP
-        * vertical_delta
-        * zipper_progress(alpha, 1.0, transition_width=transition_width)
-    )
-    return arrow
-
-
 def correspondence_lines(
     arrows,
     *,
@@ -400,3 +264,544 @@ def interpolate_mapsto_arrow(initial_arrow, final_arrow, alpha):
             + progress * final.points
         )
     return frame
+
+
+def coalesce_partitions(morphism):
+    """Return the zero-based domain and codomain classes used by coalesce."""
+    mapping = morphism.map
+
+    domain_classes = []
+    current_class = [0]
+    for index in range(1, len(morphism.domain)):
+        previous_value = mapping[index - 1]
+        current_value = mapping[index]
+        if (previous_value == 0 and current_value == 0) or (
+            previous_value != 0 and current_value == previous_value + 1
+        ):
+            current_class.append(index)
+        else:
+            domain_classes.append(current_class)
+            current_class = [index]
+    domain_classes.append(current_class)
+
+    image = set(mapping)
+    codomain_classes = []
+    current_class = [0]
+    for index in range(1, len(morphism.codomain)):
+        previous_target = index
+        if previous_target in image:
+            source_index = mapping.index(previous_target)
+            continues_mapped_run = (
+                source_index + 1 < len(mapping)
+                and mapping[source_index + 1] == index + 1
+            )
+        else:
+            continues_mapped_run = False
+
+        if continues_mapped_run:
+            current_class.append(index)
+        else:
+            codomain_classes.append(current_class)
+            current_class = [index]
+    codomain_classes.append(current_class)
+
+    return domain_classes, codomain_classes
+
+
+def play_coalesce_collapse(
+    scene,
+    morphism,
+    coalesced,
+    *,
+    source_entries,
+    target_entries,
+    arrows,
+    column_gap,
+    row_gap,
+    entry_width,
+    entry_height,
+    label_font_size,
+):
+    """Play the coalesce ballet for ``morphism`` on an on-screen diagram.
+
+    ``source_entries``, ``target_entries``, and ``arrows`` are the displayed
+    stacks and arrows (arrows in source order, mapped entries only).  Each
+    nontrivial coalesce class collapses in place -- correspondence lines
+    draw, the block's cells weld at the vertical center of their span, and
+    the parallel arrows merge -- with the batches playing sequentially; only
+    then do the surviving cells and arrows close their gaps into ordinary
+    tuple-morphism geometry, bottom-aligned with the original tuple so S, T,
+    and the morphism label stay fixed throughout.
+
+    Returns ``(surviving_source_entries, surviving_target_entries,
+    surviving_arrows)``: the mobjects left on screen for the caller to
+    dispose of.
+    """
+    domain_classes, codomain_classes = coalesce_partitions(morphism)
+
+    final_diagram = TupleMorphismDiagram(
+        coalesced.domain,
+        coalesced.codomain,
+        coalesced.map,
+        column_gap=column_gap,
+        row_gap=row_gap,
+        entry_width=entry_width,
+        entry_height=entry_height,
+        label_font_size=label_font_size,
+        source_label="S",
+        target_label="T",
+        arrow_endpoint_inset=ARROW_ENDPOINT_INSET,
+        arrow_horizontal_run=ARROW_HORIZONTAL_RUN,
+        arrow_bend_handle=ARROW_BEND_HANDLE,
+    )
+    # Standard post-coalesce geometry is bottom-aligned with the original
+    # tuple.  This makes the second stage a pure downward compaction.
+    final_diagram.shift(
+        source_entries[0].get_center()
+        - final_diagram.source_entries[0].get_center()
+    )
+    for arrow in final_diagram.arrows:
+        arrow.tail.set_opacity(0)
+
+    # First collapse each nontrivial class at the vertical center of its
+    # original span.  Singleton entries and their arrows do not move.
+    interim_source_entries = []
+    for class_index, class_ in enumerate(domain_classes):
+        if len(class_) == 1:
+            interim_source_entries.append(source_entries[class_[0]])
+            continue
+        center = sum(
+            (source_entries[index].get_center() for index in class_),
+            start=ORIGIN.copy(),
+        ) / len(class_)
+        destination = final_diagram.source_entries[class_index].copy()
+        destination.move_to(center)
+        interim_source_entries.append(destination)
+
+    interim_target_entries = []
+    for class_index, class_ in enumerate(codomain_classes):
+        if len(class_) == 1:
+            interim_target_entries.append(target_entries[class_[0]])
+            continue
+        center = sum(
+            (target_entries[index].get_center() for index in class_),
+            start=ORIGIN.copy(),
+        ) / len(class_)
+        destination = final_diagram.target_entries[class_index].copy()
+        destination.move_to(center)
+        interim_target_entries.append(destination)
+
+    surviving_source_entries = [
+        source_entries[class_[-1]] for class_ in domain_classes
+    ]
+    surviving_target_entries = [
+        target_entries[class_[-1]] for class_ in codomain_classes
+    ]
+    arrows_by_source = dict(
+        zip(
+            (index for index, target in enumerate(morphism.map) if target),
+            arrows,
+        )
+    )
+    final_arrows_by_source = dict(
+        zip(
+            (index for index, target in enumerate(coalesced.map) if target),
+            final_diagram.arrows,
+        )
+    )
+    surviving_arrows = []
+    for class_ in domain_classes:
+        mapped_indices = [index for index in class_ if morphism.map[index]]
+        if mapped_indices:
+            surviving_arrows.append(arrows_by_source[mapped_indices[-1]])
+
+    # Assemble one batch per nontrivial source class.  Its matching source
+    # entries, target entries, and parallel arrows collapse together; the
+    # batches themselves play sequentially from bottom to top.
+    collapse_batches = []
+    for class_index, class_ in enumerate(domain_classes):
+        if len(class_) == 1:
+            continue
+
+        animations = []
+        source_destination = interim_source_entries[class_index]
+        source_block_entries = [source_entries[index] for index in class_]
+        source_touching_centers = [
+            source_destination.get_center()
+            + UP * (position - (len(class_) - 1) / 2) * entry_height
+            for position in range(len(class_))
+        ]
+        for position, (entry, destination) in enumerate(
+            zip(source_block_entries, source_touching_centers)
+        ):
+            initial_box = entry[0].copy()
+            initial_center = entry.get_center().copy()
+
+            def update_cell(
+                displayed,
+                alpha,
+                initial_box=initial_box,
+                initial_center=initial_center,
+                destination=destination,
+                position=position,
+                count=len(class_),
+            ):
+                displayed.become(
+                    cell_weld_box_frame(
+                        initial_box,
+                        initial_center,
+                        destination,
+                        position,
+                        count,
+                        alpha,
+                    )
+                )
+
+            animations.extend(
+                (
+                    UpdateFromAlphaFunc(
+                        entry[0],
+                        update_cell,
+                        run_time=CORRESPONDENCE_PULL_RUN_TIME,
+                        rate_func=smooth,
+                    ),
+                    entry[1].animate(
+                        run_time=CORRESPONDENCE_PULL_RUN_TIME,
+                        rate_func=smooth,
+                    ).move_to(destination),
+                )
+            )
+
+        target_class_index = coalesced.map[class_index] - 1
+        target_class = codomain_classes[target_class_index]
+        target_destination = interim_target_entries[target_class_index]
+        target_block_entries = [
+            target_entries[index] for index in target_class
+        ]
+        target_touching_centers = [
+            target_destination.get_center()
+            + UP
+            * (position - (len(target_class) - 1) / 2)
+            * entry_height
+            for position in range(len(target_class))
+        ]
+        for position, (entry, destination) in enumerate(
+            zip(target_block_entries, target_touching_centers)
+        ):
+            initial_box = entry[0].copy()
+            initial_center = entry.get_center().copy()
+
+            def update_cell(
+                displayed,
+                alpha,
+                initial_box=initial_box,
+                initial_center=initial_center,
+                destination=destination,
+                position=position,
+                count=len(target_class),
+            ):
+                displayed.become(
+                    cell_weld_box_frame(
+                        initial_box,
+                        initial_center,
+                        destination,
+                        position,
+                        count,
+                        alpha,
+                    )
+                )
+
+            animations.extend(
+                (
+                    UpdateFromAlphaFunc(
+                        entry[0],
+                        update_cell,
+                        run_time=CORRESPONDENCE_PULL_RUN_TIME,
+                        rate_func=smooth,
+                    ),
+                    entry[1].animate(
+                        run_time=CORRESPONDENCE_PULL_RUN_TIME,
+                        rate_func=smooth,
+                    ).move_to(destination),
+                )
+            )
+
+        mapped_indices = [index for index in class_ if morphism.map[index]]
+        block_arrows = tuple(
+            arrows_by_source[index] for index in mapped_indices
+        )
+        lines = correspondence_lines(
+            block_arrows,
+            line_count=CORRESPONDENCE_LINE_COUNT,
+            endpoint_margin=CORRESPONDENCE_ENDPOINT_MARGIN,
+            stroke_width=CORRESPONDENCE_LINE_WIDTH,
+            stroke_opacity=CORRESPONDENCE_LINE_OPACITY,
+        )
+        initial_lines = lines.copy()
+        vertical_deltas = []
+        shrink_arrow_specs = []
+        target_positions = {
+            target_index: position
+            for position, target_index in enumerate(target_class)
+        }
+        for position, index in enumerate(mapped_indices):
+            arrow = arrows_by_source[index]
+            target_index = morphism.map[index] - 1
+            source_touching = source_touching_centers[class_.index(index)]
+            target_touching = target_touching_centers[
+                target_positions[target_index]
+            ]
+            source_delta = (
+                source_touching[1] - source_entries[index].get_y()
+            )
+            target_delta = (
+                target_touching[1] - target_entries[target_index].get_y()
+            )
+            if abs(source_delta - target_delta) > 1e-6:
+                raise ValueError(
+                    "coalescing arrows must be vertical translations"
+                )
+            vertical_delta = (source_delta + target_delta) / 2
+            vertical_deltas.append(vertical_delta)
+            shrink_arrow_specs.append(
+                (
+                    arrow,
+                    source_destination.get_y() - source_touching[1],
+                    position < len(mapped_indices) - 1,
+                )
+            )
+            initial_arrow = arrow.copy()
+
+            def update_arrow(
+                displayed,
+                alpha,
+                initial_arrow=initial_arrow,
+                vertical_delta=vertical_delta,
+            ):
+                displayed.become(
+                    correspondence_pull_arrow(
+                        initial_arrow, vertical_delta, alpha
+                    )
+                )
+
+            animations.append(
+                UpdateFromAlphaFunc(
+                    arrow,
+                    update_arrow,
+                    run_time=CORRESPONDENCE_PULL_RUN_TIME,
+                    rate_func=smooth,
+                )
+            )
+
+        def update_lines(
+            displayed,
+            alpha,
+            initial_lines=initial_lines,
+            first_delta=vertical_deltas[0],
+            last_delta=vertical_deltas[-1],
+        ):
+            displayed.become(
+                correspondence_line_frame(
+                    initial_lines,
+                    first_delta,
+                    last_delta,
+                    alpha,
+                )
+            )
+
+        animations.append(
+            UpdateFromAlphaFunc(
+                lines,
+                update_lines,
+                run_time=CORRESPONDENCE_PULL_RUN_TIME,
+                rate_func=smooth,
+            )
+        )
+        collapse_batches.append(
+            (
+                lines,
+                animations,
+                tuple(
+                    arrows_by_source[index]
+                    for index in mapped_indices[:-1]
+                ),
+                source_block_entries,
+                source_destination,
+                target_block_entries,
+                target_destination,
+                shrink_arrow_specs,
+            )
+        )
+
+    for (
+        lines,
+        animations,
+        redundant_arrows,
+        source_block_entries,
+        source_destination,
+        target_block_entries,
+        target_destination,
+        shrink_arrow_specs,
+    ) in collapse_batches:
+        scene.play(
+            LaggedStart(
+                *(GrowFromCenter(line) for line in lines),
+                lag_ratio=CORRESPONDENCE_DRAW_LAG_RATIO,
+            ),
+            run_time=CORRESPONDENCE_DRAW_RUN_TIME,
+        )
+        scene.wait(0.25)
+        scene.play(*animations)
+
+        source_hull = cell_weld_hull(
+            source_block_entries, source_destination.get_center()
+        )
+        target_hull = cell_weld_hull(
+            target_block_entries, target_destination.get_center()
+        )
+        source_seams = cell_weld_seams(
+            source_block_entries, source_destination.get_center()
+        )
+        target_seams = cell_weld_seams(
+            target_block_entries, target_destination.get_center()
+        )
+        source_hull.set_z_index(-1)
+        target_hull.set_z_index(-1)
+        scene.add(source_hull, target_hull, source_seams, target_seams)
+        for entry in (*source_block_entries, *target_block_entries):
+            entry[0].set_opacity(0)
+        scene.remove(lines)
+        scene.play(
+            *(
+                Uncreate(seam)
+                for seam in (*source_seams, *target_seams)
+            ),
+            run_time=0.55,
+        )
+
+        finish_animations = [
+            Transform(
+                source_hull,
+                cell_weld_product_box(source_destination),
+            ),
+            ReplacementTransform(
+                VGroup(*(entry[1] for entry in source_block_entries)),
+                source_destination[1],
+            ),
+            Transform(
+                target_hull,
+                cell_weld_product_box(target_destination),
+            ),
+            ReplacementTransform(
+                VGroup(*(entry[1] for entry in target_block_entries)),
+                target_destination[1],
+            ),
+        ]
+        for arrow, vertical_delta, redundant in shrink_arrow_specs:
+            initial_arrow = arrow.copy()
+
+            def finish_arrow(
+                displayed,
+                alpha,
+                initial_arrow=initial_arrow,
+                vertical_delta=vertical_delta,
+                redundant=redundant,
+            ):
+                frame = correspondence_pull_arrow(
+                    initial_arrow, vertical_delta, alpha
+                )
+                frame.tail.set_opacity(0)
+                if redundant:
+                    frame.shaft.set_opacity(1.0 - alpha)
+                    frame.tip.set_opacity(1.0 - alpha)
+                displayed.become(frame)
+
+            finish_animations.append(
+                UpdateFromAlphaFunc(
+                    arrow,
+                    finish_arrow,
+                    rate_func=smooth,
+                )
+            )
+        scene.play(*finish_animations, run_time=0.8)
+
+        source_survivor = source_block_entries[-1]
+        target_survivor = target_block_entries[-1]
+        scene.remove(
+            source_hull,
+            target_hull,
+            source_destination[1],
+            target_destination[1],
+            *source_block_entries,
+            *target_block_entries,
+        )
+        source_survivor.become(source_destination)
+        target_survivor.become(target_destination)
+        scene.add(source_survivor, target_survivor)
+        for arrow in redundant_arrows:
+            arrow.set_opacity(0)
+        scene.wait(0.18)
+    scene.wait(0.22)
+
+    # Only after every block has collapsed in place do the surviving cells
+    # and arrows close their gaps into ordinary tuple-morphism geometry.
+    compaction_animations = [
+        *(
+            survivor.animate.move_to(
+                final_diagram.source_entries[class_index].get_center()
+            )
+            for class_index, survivor in enumerate(surviving_source_entries)
+        ),
+        *(
+            survivor.animate.move_to(
+                final_diagram.target_entries[class_index].get_center()
+            )
+            for class_index, survivor in enumerate(surviving_target_entries)
+        ),
+    ]
+    for class_index, survivor in zip(
+        (index for index, target in enumerate(coalesced.map) if target),
+        surviving_arrows,
+    ):
+        target_class_index = coalesced.map[class_index] - 1
+        initial_arrow = TupleMorphismDiagram.mapsto_arrow(
+            surviving_source_entries[class_index].get_right(),
+            surviving_target_entries[target_class_index].get_left(),
+            endpoint_inset=ARROW_ENDPOINT_INSET,
+            horizontal_run=ARROW_HORIZONTAL_RUN,
+            bend_handle=ARROW_BEND_HANDLE,
+        )
+        initial_arrow.tail.set_opacity(0)
+        final_arrow = final_arrows_by_source[class_index].copy()
+
+        def update_arrow(
+            displayed,
+            alpha,
+            initial_arrow=initial_arrow,
+            final_arrow=final_arrow,
+        ):
+            displayed.become(
+                interpolate_mapsto_arrow(
+                    initial_arrow,
+                    final_arrow,
+                    alpha,
+                )
+            )
+
+        compaction_animations.append(
+            UpdateFromAlphaFunc(
+                survivor,
+                update_arrow,
+                rate_func=smooth,
+            )
+        )
+    scene.play(*compaction_animations, run_time=1.25)
+    scene.wait(0.45)
+
+    scene.wait(2.0)
+
+    return (
+        surviving_source_entries,
+        surviving_target_entries,
+        surviving_arrows,
+    )

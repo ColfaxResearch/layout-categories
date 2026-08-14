@@ -2,3 +2,6 @@
 __pycache__/
 *.py[cod]
 media/
+
+# stray renders outside media/
+*.mp4

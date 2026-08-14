@@ -23,34 +23,37 @@ their carets and fanning out toward Y, the strands to X becoming parallel
 and taking carets), then its blocks reorder into the order of Y'.  The
 morphism data migrates in place -- a's fans become g''s arrows and g's
 arrows become a''s fans -- so each leg label transforms where it stands.
-After stage 2 the chain reads Tuple, Tuple, Fact, Fact: the two tuple legs
-compose as X dissolves and the two Fact legs compose as Y dissolves, and the
-outer stacks contract onto the composite cospan.
+With ``single_beat`` set (see cospan_composition_single_beat_test.py) the
+pushforward plays as ONE beat instead of two: every middle cell splits and
+its pieces travel straight to their Y' slots, so the split and the
+reordering are a single motion; blocks with no place in Y' fade unsplit,
+and the arrivals join the same beat.  After the pushforward the chain reads
+Tuple, Tuple, Fact, Fact: the two tuple legs compose as X dissolves and the
+two Fact legs compose as Y dissolves, and the outer stacks contract onto
+the composite cospan.
 
 The special cases mirror the span scene's: a Y cell outside g's image
 arrives in Y' with a fan and no arrow, a T cell sent to the basepoint by g
 retires with its block, and an S cell whose route runs through it loses that
 route when X dissolves.  The library supplies every stack and map:
 ``pushforward_with_refinement`` gives Y', a' and g',
-``CoSpan_morphism.compose`` the picture being landed on.
+``CoSpanMorphism.compose`` the picture being landed on.
 """
+
+from layout_categories_viz.scene_base import LayoutScene
 
 from dataclasses import dataclass
 from math import prod
 
-import numpy as np
 from manim import (
     Create,
     FadeIn,
     FadeOut,
     LaggedStart,
     LEFT,
-    ORIGIN,
     RIGHT,
-    Scene,
     ShrinkToCenter,
     Succession,
-    Text,
     Transform,
     Uncreate,
     ValueTracker,
@@ -58,36 +61,32 @@ from manim import (
     Write,
     smooth,
 )
-from tract import CoSpan_morphism, Fact_morphism, Tuple_morphism
+from tract import CoSpanMorphism, FactMorphism, TupleMorphism
 
 from layout_categories_viz.animations import (
     DrawMapstoTip,
     TailToTipMapsto,
     UndrawMapstoTip,
 )
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
 
 # The composition scene owns the route-surgery helpers, the pullback scene
 # the drawing primitives and the two-stage gesture, and the weak-composition
 # scene the bridging, so this scene cannot drift from any of them.
-from scenes.tuple_morphism_composition_curve import _matched_path_pair
-from scenes.tuple_pullback_test import (
-    ARROW_INSET,
-    CELL_H,
-    LABEL_FONT_SIZE,
-    MAX_STACK_HEIGHT,
-    SLOT_STEP,
-    TuplePullbackTest,
-    _revealed,
+from layout_categories_viz.paths import matched_path_pair
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import ARROW_INSET, revealed
+from layout_categories_viz.paths import bridge, join_route
+from scenes.span_common import (
+    COL_S,
+    COL_T,
+    COL_U,
+    COL_X,
+    COL_Y,
+    CONTRACTION,
+    composition_labels,
+    owner_of_leaf,
+    span_geometry,
 )
-from scenes.weak_composition_test import _bridge, _join_route
-
-COLUMN_GAP = 3.0
-COL_S, COL_X, COL_T, COL_Y, COL_U = ((index - 2) * COLUMN_GAP for index in range(5))
-# The composite cospan occupies the footprint of a single cospan: the outer
-# stacks come in by one column pitch each and the refined nadir, already in
-# the middle, stays put.
-CONTRACTION = COLUMN_GAP
 
 
 @dataclass(frozen=True)
@@ -104,15 +103,15 @@ class CoSpanCompositionExample:
         """The cospans, validated by the library."""
         nadir = tuple(x for mode in self.first_modes for x in mode)
         middle = tuple(prod(mode) for mode in self.first_modes)
-        first = CoSpan_morphism(
-            Tuple_morphism(self.domain, nadir, self.first_map),
-            Fact_morphism(nadir, middle, self.first_modes),
+        first = CoSpanMorphism(
+            TupleMorphism(self.domain, nadir, self.first_map),
+            FactMorphism(nadir, middle, self.first_modes),
         )
         second_nadir = tuple(y for mode in self.second_modes for y in mode)
         codomain = tuple(prod(mode) for mode in self.second_modes)
-        second = CoSpan_morphism(
-            Tuple_morphism(middle, second_nadir, self.second_map),
-            Fact_morphism(second_nadir, codomain, self.second_modes),
+        second = CoSpanMorphism(
+            TupleMorphism(middle, second_nadir, self.second_map),
+            FactMorphism(second_nadir, codomain, self.second_modes),
         )
         return first, second
 
@@ -140,14 +139,17 @@ EXAMPLES = (
 )
 
 
-class CoSpanMorphismCompositionTest(Scene):
+class CoSpanMorphismCompositionTest(LayoutScene):
     """Push the middle Fact past the middle Tuple, then compose like pairs."""
 
+    # With single_beat set the pushforward plays as one beat instead of two:
+    # the split and the reordering are a single motion.
+    single_beat: bool = False
+
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._play_example(example)
-            TuplePullbackTest._clear_scene(self, last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _play_example(self, example: CoSpanCompositionExample) -> None:
         first, second = example.cospans()
@@ -178,48 +180,20 @@ class CoSpanMorphismCompositionTest(Scene):
         }
         leaf_to_x = {leaf: i for i, leaf in destination.items()}
 
-        # Geometry: one bottom baseline, one uniform step, scaled to fit.
-        slots = max(
+        geometry = span_geometry(
             len(first.domain),
             len(first.nadir),
             len(second.nadir),
             len(refinement.domain),
             len(composite.codomain),
         )
-        scale = min(1.0, MAX_STACK_HEIGHT / ((slots - 1) * SLOT_STEP + CELL_H))
-        step = SLOT_STEP * scale
+        place = geometry.place
+        cell = geometry.cell
+        stack_label = geometry.stack_label
+        leg_label = geometry.leg_label
 
-        def place(column, index):
-            return np.array(
-                (column, -((slots - 1) * step) / 2 + index * step + 0.45, 0.0)
-            )
-
-        def cell(value, center):
-            return (
-                TuplePullbackTest._cell(value, ORIGIN)
-                .scale(scale)
-                .move_to(center)
-            )
-
-        stack_label_y = place(0, 0)[1] - CELL_H * scale / 2 - 0.42
-        leg_label_y = stack_label_y - 0.62
-
-        def stack_label(text, column):
-            return (
-                Text(text, color=INK, font=CODE_FONT, font_size=LABEL_FONT_SIZE)
-                .scale(scale)
-                .move_to(np.array([column, stack_label_y, 0.0]))
-            )
-
-        def leg_label(text, x):
-            return (
-                Text(text, color=INK, font=CODE_FONT, font_size=28)
-                .scale(scale)
-                .move_to(np.array([x, leg_label_y, 0.0]))
-            )
-
-        segment = TuplePullbackTest._tree_segment
-        attached = TuplePullbackTest._attached
+        segment = stacks.tree_segment
+        attached = stacks.attached
 
         # --- Open: both cospans, arrows forward and fans backward. -----------
         s_cells = [
@@ -244,7 +218,7 @@ class CoSpanMorphismCompositionTest(Scene):
         ]
 
         first_arrows = {
-            s: TuplePullbackTest._segment_arrow(s_cells[s], x_cells[i - 1])
+            s: stacks.segment_arrow(s_cells[s], x_cells[i - 1])
             for s, i in enumerate(first.left.map)
             if i
         }
@@ -254,7 +228,7 @@ class CoSpanMorphismCompositionTest(Scene):
             for i in leaves
         }
         second_arrows = {
-            t: TuplePullbackTest._segment_arrow(t_cells[t], y_cells[j - 1])
+            t: stacks.segment_arrow(t_cells[t], y_cells[j - 1])
             for t, j in enumerate(second.left.map)
             if j
         }
@@ -317,17 +291,31 @@ class CoSpanMorphismCompositionTest(Scene):
         )
         self.wait(0.35)
 
-        # --- Stage 1: the middle splits in place along the first backward ----
-        # leg.  g's arrows give up their carets and fan out toward Y; the
-        # strands to X become parallel, cell for cell.
+        # --- The pushforward.  Two beats: the middle splits in place along ---
+        # the first backward leg (g's arrows give up their carets and fan
+        # out toward Y, the strands to X become parallel and take carets),
+        # then its blocks reorder into the order of Y'.  One beat
+        # (``single_beat``): every middle cell splits and its pieces travel
+        # straight to their Y' slots, so the split and the reordering are
+        # one motion; a T cell sent to the basepoint by g fades with its
+        # block unsplit, and the arrivals join the same beat.
         self.play(
             *(UndrawMapstoTip(arrow.tip) for arrow in second_arrows.values()),
             run_time=0.4,
         )
 
         alpha = ValueTracker(0.0)
+        # T cells sent to the basepoint by g, whose blocks have no place
+        # in Y'.
+        retiring_modes = [
+            mode
+            for mode, j in enumerate(second.left.map)
+            if not j
+        ]
         middle_cells, middle_strands, y_strands = {}, {}, {}
         for mode, leaves in enumerate(x_groups):
+            if self.single_beat and mode in retiring_modes:
+                continue
             start_center = t_cells[mode].get_center()
             image = second.left.map[mode]
             for index, i in enumerate(leaves):
@@ -336,11 +324,11 @@ class CoSpanMorphismCompositionTest(Scene):
                     coarse = cell(first.codomain[mode], start_center)[1]
                     split[1].set_opacity(0)
                     split.add(coarse)
-                TuplePullbackTest._split(
+                stacks.split_cell(
                     split,
                     alpha,
                     start_center,
-                    place(COL_T, i),
+                    place(COL_T, destination[i] if self.single_beat else i),
                     peeled=bool(index),
                 )
                 middle_cells[i] = split
@@ -353,82 +341,11 @@ class CoSpanMorphismCompositionTest(Scene):
                         split,
                         y_cells[image - 1],
                         reveal=(
-                            (lambda: _revealed(alpha.get_value()))
+                            (lambda: revealed(alpha.get_value()))
                             if index
                             else None
                         ),
                     )
-
-        # Every replacement starts out coincident with what it replaces.  The
-        # middle is becoming a second copy of X, cell for cell.
-        self.remove(
-            *t_cells,
-            *first_fans.values(),
-            *(arrow.shaft for arrow in second_arrows.values()),
-            *(arrow.tail for arrow in second_arrows.values()),
-        )
-        self.add(*middle_strands.values(), *y_strands.values())
-        self.add(*TuplePullbackTest._deck(middle_cells))
-        label_x_middle = stack_label("X", COL_T)
-        self.play(
-            alpha.animate.set_value(1.0),
-            FadeOut(label_t),
-            FadeIn(label_x_middle),
-            run_time=1.4,
-            rate_func=smooth,
-        )
-        for split in middle_cells.values():
-            split.clear_updaters()
-
-        # The parallel strands take carets: they are becoming g', whose
-        # carets they keep through the reordering, following their cells.
-        tips = {
-            i: TuplePullbackTest._arrow_tip(
-                split.get_left() + LEFT * ARROW_INSET
-            )
-            for i, split in middle_cells.items()
-        }
-        self.add(*tips.values())
-        self.play(*(DrawMapstoTip(tip) for tip in tips.values()), run_time=0.4)
-        # Only now do the carets start following their cells: an updater
-        # rebuilding the caret each frame would fight the draw above.
-        for i, tip in tips.items():
-            tip.add_updater(
-                lambda mobject, split=middle_cells[i]: mobject.become(
-                    TuplePullbackTest._arrow_tip(
-                        split.get_left() + LEFT * ARROW_INSET
-                    )
-                )
-            )
-        self.wait(0.6)
-
-        # --- Stage 2: reorder the blocks into the order of Y'.  A T cell -----
-        # sent to the basepoint by g has no place in Y', so its block
-        # leaves.  The morphism data migrates in place: a's fans have become
-        # g''s arrows and g's arrows have become a''s fans, so each label
-        # transforms where it stands.
-        retiring = [i for i in middle_cells if i not in destination]
-        for i in retiring:
-            middle_strands[i].clear_updaters()
-            tips[i].clear_updaters()
-        self.add(*(middle_cells[i] for i in retiring))
-        self.add(
-            *TuplePullbackTest._deck(
-                {
-                    destination[i]: middle_cells[i]
-                    for i in middle_cells
-                    if i in destination
-                }
-            )
-        )
-        reorder = [
-            middle_cells[i].animate.move_to(place(COL_T, destination[i]))
-            for i in middle_cells
-            if i in destination
-        ] + [
-            FadeOut(VGroup(middle_cells[i], middle_strands[i], tips[i]))
-            for i in retiring
-        ]
 
         # A Y cell outside g's image has no block to receive: it carries its
         # own value into Y', arriving with a fan and no arrow.
@@ -449,22 +366,155 @@ class CoSpanMorphismCompositionTest(Scene):
                     )
                 )
 
-        self.play(
-            *reorder,
-            *arrivals,
-            FadeOut(label_x_middle),
-            FadeIn(stack_label("Y′", COL_T)),
-            Transform(label_a, leg_label("g′", (COL_X + COL_T) / 2)),
-            Transform(label_g, leg_label("a′", (COL_T + COL_Y) / 2)),
-            run_time=1.4,
-            rate_func=smooth,
-        )
-        for mobject in (
-            *middle_strands.values(),
-            *y_strands.values(),
-            *(tips[i] for i in tips if i not in retiring),
-        ):
-            mobject.clear_updaters()
+        if self.single_beat:
+            # Every replacement starts out coincident with what it replaces;
+            # the blocks with no place in Y' keep their originals, to fade
+            # unsplit.
+            self.remove(
+                *(
+                    t_cells[mode]
+                    for mode in range(len(first.codomain))
+                    if mode not in retiring_modes
+                ),
+                *(
+                    first_fans[i]
+                    for mode, leaves in enumerate(x_groups)
+                    if mode not in retiring_modes
+                    for i in leaves
+                ),
+                *(arrow.shaft for arrow in second_arrows.values()),
+                *(arrow.tail for arrow in second_arrows.values()),
+            )
+            self.add(*middle_strands.values(), *y_strands.values())
+            self.add(
+                *stacks.deck(
+                    {destination[i]: middle_cells[i] for i in middle_cells}
+                )
+            )
+            self.play(
+                alpha.animate.set_value(1.0),
+                *arrivals,
+                *(FadeOut(t_cells[mode]) for mode in retiring_modes),
+                *(
+                    FadeOut(first_fans[i])
+                    for mode in retiring_modes
+                    for i in x_groups[mode]
+                ),
+                FadeOut(label_t),
+                FadeIn(stack_label("Y′", COL_T)),
+                Transform(label_a, leg_label("g′", (COL_X + COL_T) / 2)),
+                Transform(label_g, leg_label("a′", (COL_T + COL_Y) / 2)),
+                run_time=1.8,
+                rate_func=smooth,
+            )
+            for mobject in (
+                *middle_cells.values(),
+                *middle_strands.values(),
+                *y_strands.values(),
+            ):
+                mobject.clear_updaters()
+
+            # The crossed parallel strands take carets: they are g'.
+            tips = {
+                i: stacks.arrow_tip(
+                    split.get_left() + LEFT * ARROW_INSET
+                )
+                for i, split in middle_cells.items()
+            }
+            self.add(*tips.values())
+            self.play(
+                *(DrawMapstoTip(tip) for tip in tips.values()), run_time=0.4
+            )
+        else:
+            # Every replacement starts out coincident with what it replaces.
+            # The middle is becoming a second copy of X, cell for cell.
+            self.remove(
+                *t_cells,
+                *first_fans.values(),
+                *(arrow.shaft for arrow in second_arrows.values()),
+                *(arrow.tail for arrow in second_arrows.values()),
+            )
+            self.add(*middle_strands.values(), *y_strands.values())
+            self.add(*stacks.deck(middle_cells))
+            label_x_middle = stack_label("X", COL_T)
+            self.play(
+                alpha.animate.set_value(1.0),
+                FadeOut(label_t),
+                FadeIn(label_x_middle),
+                run_time=1.4,
+                rate_func=smooth,
+            )
+            for split in middle_cells.values():
+                split.clear_updaters()
+
+            # The parallel strands take carets: they are becoming g', whose
+            # carets they keep through the reordering, following their cells.
+            tips = {
+                i: stacks.arrow_tip(
+                    split.get_left() + LEFT * ARROW_INSET
+                )
+                for i, split in middle_cells.items()
+            }
+            self.add(*tips.values())
+            self.play(
+                *(DrawMapstoTip(tip) for tip in tips.values()), run_time=0.4
+            )
+            # Only now do the carets start following their cells: an updater
+            # rebuilding the caret each frame would fight the draw above.
+            for i, tip in tips.items():
+                tip.add_updater(
+                    lambda mobject, split=middle_cells[i]: mobject.become(
+                        stacks.arrow_tip(
+                            split.get_left() + LEFT * ARROW_INSET
+                        )
+                    )
+                )
+            self.wait(0.6)
+
+            # --- Stage 2: reorder the blocks into the order of Y'.  A T ------
+            # cell sent to the basepoint by g has no place in Y', so its
+            # block leaves.  The morphism data migrates in place: a's fans
+            # have become g''s arrows and g's arrows have become a''s fans,
+            # so each label transforms where it stands.
+            retiring = [i for i in middle_cells if i not in destination]
+            for i in retiring:
+                middle_strands[i].clear_updaters()
+                tips[i].clear_updaters()
+            self.add(*(middle_cells[i] for i in retiring))
+            self.add(
+                *stacks.deck(
+                    {
+                        destination[i]: middle_cells[i]
+                        for i in middle_cells
+                        if i in destination
+                    }
+                )
+            )
+            reorder = [
+                middle_cells[i].animate.move_to(place(COL_T, destination[i]))
+                for i in middle_cells
+                if i in destination
+            ] + [
+                FadeOut(VGroup(middle_cells[i], middle_strands[i], tips[i]))
+                for i in retiring
+            ]
+
+            self.play(
+                *reorder,
+                *arrivals,
+                FadeOut(label_x_middle),
+                FadeIn(stack_label("Y′", COL_T)),
+                Transform(label_a, leg_label("g′", (COL_X + COL_T) / 2)),
+                Transform(label_g, leg_label("a′", (COL_T + COL_Y) / 2)),
+                run_time=1.4,
+                rate_func=smooth,
+            )
+            for mobject in (
+                *middle_strands.values(),
+                *y_strands.values(),
+                *(tips[i] for i in tips if i not in retiring),
+            ):
+                mobject.clear_updaters()
         self.wait(0.6)
 
         # The chain now reads Tuple, Tuple, Fact, Fact: re-key the middle by
@@ -519,7 +569,7 @@ class CoSpanMorphismCompositionTest(Scene):
         # copy of the shared U-ward strand per Y' leaf.
         left_bridges = {}
         for s, leaf in surviving.items():
-            left_bridges[s] = _bridge(
+            left_bridges[s] = bridge(
                 first_arrows[s].shaft.get_end(),
                 left_strands[leaf].get_start(),
             )
@@ -530,7 +580,7 @@ class CoSpanMorphismCompositionTest(Scene):
             )
             shared = second_fans[j].copy()
             right_pieces[leaf] = shared
-            right_bridges[leaf] = _bridge(
+            right_bridges[leaf] = bridge(
                 right_strands[leaf].get_end(), shared.get_start()
             )
 
@@ -549,48 +599,41 @@ class CoSpanMorphismCompositionTest(Scene):
 
         # The composed labels form in step with the move-in, so each label
         # stays centered under the portion of the diagram it names.
-        left_reference = Text(
-            "g′ ∘ f", color=INK, font=CODE_FONT, font_size=28
-        ).scale(scale)
-        left_reference.move_to(
-            np.array([(COL_S + CONTRACTION + COL_T) / 2, leg_label_y, 0.0])
+        # "g′ ∘ f" splits into g,′,␣,∘,␣,f and "b ∘ a′" into b,␣,∘,␣,a,′.
+        left_reference, right_reference, left_symbol, right_symbol = (
+            composition_labels(
+                "g′ ∘ f",
+                "b ∘ a′",
+                scale=geometry.scale,
+                leg_label_y=geometry.leg_label_y,
+                left_symbol_index=3,
+                right_symbol_index=2,
+            )
         )
-        right_reference = Text(
-            "b ∘ a′", color=INK, font=CODE_FONT, font_size=28
-        ).scale(scale)
-        right_reference.move_to(
-            np.array([(COL_T + COL_U - CONTRACTION) / 2, leg_label_y, 0.0])
-        )
-        # Text submobjects include space glyphs: "g′ ∘ f" splits into
-        # g,′,␣,∘,␣,f and "b ∘ a′" into b,␣,∘,␣,a,′.
-        left_symbol = Text("∘", color=INK, font=CODE_FONT, font_size=28)
-        left_symbol.scale(scale).move_to(left_reference[3])
-        right_symbol = Text("∘", color=INK, font=CODE_FONT, font_size=28)
-        right_symbol.scale(scale).move_to(right_reference[2])
 
         initial_routes = VGroup()
         final_routes = VGroup()
         for s, leaf in surviving.items():
-            glued = _join_route(
+            glued = join_route(
                 first_arrows[s].shaft, left_bridges[s], left_strands[leaf]
             )
             final_shaft = segment(
                 s_cells[s].get_right() + left_shift,
                 yprime_cells[leaf].get_left(),
             )
-            initial, final = _matched_path_pair(glued, final_shaft)
+            initial, final = matched_path_pair(glued, final_shaft)
             initial_routes.add(initial)
             final_routes.add(final)
         for leaf in yprime_cells:
-            glued = _join_route(
+            glued = join_route(
                 right_strands[leaf], right_bridges[leaf], right_pieces[leaf]
             )
-            owner = composite_right_owner(composite, leaf)
+            owner = owner_of_leaf(composite.right.modes, leaf)
             final_segment = segment(
                 yprime_cells[leaf].get_right(),
                 u_cells[owner].get_left() + right_shift,
             )
-            initial, final = _matched_path_pair(glued, final_segment)
+            initial, final = matched_path_pair(glued, final_segment)
             initial_routes.add(initial)
             final_routes.add(final)
 
@@ -621,13 +664,3 @@ class CoSpanMorphismCompositionTest(Scene):
         self.remove(initial_routes)
         self.add(final_routes)
         self.wait(1.0)
-
-
-def composite_right_owner(composite, leaf: int) -> int:
-    """Which composite-codomain cell a Y' leaf belongs to."""
-    running = 0
-    for k, mode in enumerate(composite.right.modes):
-        running += len(mode)
-        if leaf < running:
-            return k
-    raise ValueError(f"Leaf {leaf} outside the composite codomain.")

@@ -32,11 +32,13 @@ Fact composition animation exactly; the landing differs on purpose,
 because composition in Ref remembers the tower of refinements -- the
 composite is the grafted tree (one junction where each middle cell stood),
 where Fact would flatten the blocks into fans.  The library supplies every
-stack and tree: Ref_morphism.compose gives the grafted nest the collapse
+stack and tree: RefMorphism.compose gives the grafted nest the collapse
 lands on.  The second morphism's top-level modes are kept as tuples (as
 every Fact-style presentation writes them), so each middle cell's graft
 junction is present in the composite.
 """
+
+from layout_categories_viz.scene_base import LayoutScene
 
 from dataclasses import dataclass
 
@@ -48,7 +50,6 @@ from manim import (
     LaggedStart,
     LEFT,
     RIGHT,
-    Scene,
     ShrinkToCenter,
     Text,
     Transform,
@@ -56,26 +57,26 @@ from manim import (
     VMobject,
     Write,
 )
-from tract import NestedTuple, Ref_morphism
+from tract import NestedTuple, RefMorphism
 
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 # The composition scene owns the route-surgery helpers, the pullback scene
 # the drawing primitives, and the create scene the banded trees, so this
 # scene cannot drift from any of them.
-from scenes.ref_morphism_create_test import ref_tree_with_paths
-from scenes.tuple_morphism_composition_curve import (
-    _append_cubic_segments,
-    _matched_path_pair,
+from layout_categories_viz.ref_trees import ref_tree_with_paths
+from layout_categories_viz.paths import (
+    append_cubic_segments,
+    matched_path_pair,
 )
-from scenes.tuple_pullback_test import (
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import (
     CELL_H,
     LEFT_X,
     MID_X,
     RIGHT_X,
     SLOT_STEP,
     STROKE_WIDTH,
-    TuplePullbackTest,
 )
 
 LABEL_BUFF = 0.55
@@ -84,18 +85,18 @@ LABEL_BUFF = 0.55
 def _joined_route(pieces) -> VMobject:
     """Join consecutive strand sections into one identical VMobject path.
 
-    The generalization of _three_segment_route to any number of pieces:
+    The generalization of three_segment_route to any number of pieces:
     consecutive pieces meet exactly (at junction anchors, or across an
     exact connector), so appending their cubics reproduces the strokes.
     """
     route = VMobject(stroke_color=INK, stroke_width=STROKE_WIDTH)
     route.start_new_path(pieces[0].points[0])
     for piece in pieces:
-        _append_cubic_segments(route, piece.points)
+        append_cubic_segments(route, piece.points)
     return route
 
 
-def _tree_forest(morphism: Ref_morphism, source_cells, target_cells):
+def _tree_forest(morphism: RefMorphism, source_cells, target_cells):
     """All of a morphism's trees, with per-mode edge and leaf-address data.
 
     Leaves anchor on the right edges of ``source_cells`` and each mode's
@@ -133,8 +134,8 @@ class RefCompositionExample:
 
     def morphisms(self) -> tuple:
         """The morphisms a and b, validated by the library."""
-        f = Ref_morphism(NestedTuple(self.first_nest))
-        g = Ref_morphism(NestedTuple(self.second_nest))
+        f = RefMorphism(NestedTuple(self.first_nest))
+        g = RefMorphism(NestedTuple(self.second_nest))
         return f, g
 
 
@@ -161,12 +162,11 @@ EXAMPLES = (
 )
 
 
-class RefMorphismCompositionTest(Scene):
+class RefMorphismCompositionTest(LayoutScene):
     def construct(self):
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._play_example(example)
-            TuplePullbackTest._clear_scene(self, last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _play_example(self, example: RefCompositionExample) -> None:
         f, g = example.morphisms()
@@ -193,7 +193,7 @@ class RefMorphismCompositionTest(Scene):
         def column(values, x):
             return VGroup(
                 *(
-                    TuplePullbackTest._cell(
+                    stacks.cell(
                         value, np.array([x, baseline + i * SLOT_STEP, 0.0])
                     )
                     for i, value in enumerate(values)
@@ -341,7 +341,7 @@ class RefMorphismCompositionTest(Scene):
         initial_strokes = VGroup()
         final_strokes = VGroup()
         for initial_piece, final_piece in pairs:
-            initial, final = _matched_path_pair(initial_piece, final_piece)
+            initial, final = matched_path_pair(initial_piece, final_piece)
             initial_strokes.add(initial)
             final_strokes.add(final)
 

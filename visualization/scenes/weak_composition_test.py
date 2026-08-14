@@ -30,55 +30,51 @@ Finally the two-stage route ``S' -> W -> V'`` collapses into the weak composite
 and ``W`` retires.  The coalescence ``weak_composite`` ends with is omitted.
 """
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 
 import numpy as np
 from manim import (
     Create,
-    CubicBezier,
     DOWN,
     FadeIn,
     FadeOut,
     LEFT,
     ORIGIN,
     RIGHT,
-    Scene,
     ShrinkToCenter,
     Succession,
     Text,
     Transform,
     ValueTracker,
     VGroup,
-    VMobject,
     smooth,
 )
 from tract import (
     NestedTuple,
-    Nest_morphism,
+    NestMorphism,
     mutual_refinement,
     weak_composite,
 )
 
 from layout_categories_viz.animations import DrawMapstoTip, UndrawMapstoTip
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.paths import bridge, join_route, matched_path_pair
+from layout_categories_viz.style import CODE_FONT, INK
 from layout_categories_viz.tuple_morphism import MapstoArrow
-from scenes.tuple_morphism_composition_curve import (
-    _append_cubic_segments,
-    _matched_path_pair,
-)
 
-# The pullback scene owns the drawing primitives every refinement animation
-# shares, so they cannot drift apart.
-from scenes.tuple_pullback_test import (
+# The library owns the drawing primitives every refinement animation shares,
+# so they cannot drift apart.
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import (
     ARROW_INSET,
     CELL_H,
     LABEL_FONT_SIZE,
     MAX_STACK_HEIGHT,
     SLOT_STEP,
-    STROKE_WIDTH,
-    TuplePullbackTest,
-    _groups,
-    _revealed,
+    leaf_groups,
+    make_place,
+    revealed,
 )
 from scenes.tuple_mutual_refinement_test import TupleMorphismRefinementTest
 
@@ -165,45 +161,21 @@ OPENING_SHIFT = COLUMN_GAP / 2
 COMPOSITE_HALF_WIDTH = COLUMN_GAP / 2
 
 
-def _join_route(*paths) -> VMobject:
-    """Join consecutive shaft sections into one identical path."""
-    route = VMobject(stroke_color=INK, stroke_width=STROKE_WIDTH)
-    route.start_new_path(paths[0].points[0])
-    for path in paths:
-        _append_cubic_segments(route, path.points)
-    return route
-
-
-def _bridge(start, end) -> CubicBezier:
-    """A straight cubic crossing a ``W`` cell between two shaft ends."""
-    start = np.array(start, dtype=float)
-    span = np.array(end, dtype=float) - start
-    return CubicBezier(
-        start,
-        start + span / 3,
-        start + 2 * span / 3,
-        start + span,
-        color=INK,
-        stroke_width=STROKE_WIDTH,
-    )
-
-
-class WeakCompositionTest(Scene):
+class WeakCompositionTest(LayoutScene):
     """Refine, pull back, push forward, and compose through the refinement."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._show_weak_composite(example)
-            self._clear_scene(last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _show_weak_composite(self, example: WeakCompositionExample) -> None:
         S = NestedTuple(example.domain)
         T = NestedTuple(example.first_codomain)
         U = NestedTuple(example.second_domain)
         V = NestedTuple(example.codomain)
-        f = Nest_morphism(S, T, example.first_map)
-        g = Nest_morphism(U, V, example.second_map)
+        f = NestMorphism(S, T, example.first_map)
+        g = NestMorphism(U, V, example.second_map)
         Tprime, Uprime = mutual_refinement(T, U)
         if Tprime.flatten() != Uprime.flatten():
             raise ValueError(
@@ -216,8 +188,8 @@ class WeakCompositionTest(Scene):
         weak_composite(f, g)  # validates the whole construction
 
         shared = Tprime.flatten()
-        s_groups = _groups(Sprime, S)
-        v_groups = _groups(Vprime, V)
+        s_groups = leaf_groups(Sprime, S)
+        v_groups = leaf_groups(Vprime, V)
 
         # Geometry: one bottom baseline, one uniform step, scaled to fit.
         slots = max(
@@ -227,12 +199,11 @@ class WeakCompositionTest(Scene):
         step = SLOT_STEP * scale
         baseline = -((slots - 1) * step) / 2
 
-        def place(column, index):
-            return np.array((column, baseline + index * step, 0.0))
+        place = make_place(baseline, step)
 
         def cell(value, center):
             return (
-                TuplePullbackTest._cell(value, ORIGIN)
+                stacks.cell(value, ORIGIN)
                 .scale(scale)
                 .move_to(center)
             )
@@ -246,7 +217,7 @@ class WeakCompositionTest(Scene):
                 .next_to(anchor, DOWN, buff=0.3)
             )
 
-        segment = TuplePullbackTest._tree_segment
+        segment = stacks.tree_segment
 
         # --- Open: f and g, with a gap between them for the refinement. ------
         s_cells = [
@@ -266,14 +237,14 @@ class WeakCompositionTest(Scene):
             for mode in range(V.length())
         ]
         f_arrows = {
-            mode: TuplePullbackTest._segment_arrow(
+            mode: stacks.segment_arrow(
                 s_cells[mode], t_cells[target - 1]
             )
             for mode, target in enumerate(example.first_map)
             if target
         }
         g_arrows = {
-            mode: TuplePullbackTest._segment_arrow(
+            mode: stacks.segment_arrow(
                 u_cells[mode], v_cells[target - 1]
             )
             for mode, target in enumerate(example.second_map)
@@ -411,7 +382,7 @@ class WeakCompositionTest(Scene):
             self.add(
                 *half["fans"].values(),
                 *half["inner"].values(),
-                *TuplePullbackTest._deck(half["cells"]),
+                *stacks.deck(half["cells"]),
             )
 
         label_tprime = label("T'", cell(shared[0], place(X_T, 0)))
@@ -433,13 +404,13 @@ class WeakCompositionTest(Scene):
         # together they exhibit the inclusion of the mutual refinement: T' into
         # W on the left, W into U' on the right.
         left["tips"] = {
-            leaf: TuplePullbackTest._arrow_tip(
+            leaf: stacks.arrow_tip(
                 w_cells[leaf].get_left() + LEFT * ARROW_INSET
             )
             for leaf in left["cells"]
         }
         right["tips"] = {
-            leaf: TuplePullbackTest._arrow_tip(
+            leaf: stacks.arrow_tip(
                 right["cells"][leaf].get_left() + LEFT * ARROW_INSET
             )
             for leaf in right["cells"]
@@ -456,7 +427,7 @@ class WeakCompositionTest(Scene):
         for leaf, tip in right["tips"].items():
             tip.add_updater(
                 lambda mobject, leaf=leaf: mobject.become(
-                    TuplePullbackTest._arrow_tip(
+                    stacks.arrow_tip(
                         right["cells"][leaf].get_left() + LEFT * ARROW_INSET
                     )
                 )
@@ -491,7 +462,7 @@ class WeakCompositionTest(Scene):
             # its cells are heading for, so blocks passing one another always
             # cover in the same direction, as they did while splitting.
             self.add(
-                *TuplePullbackTest._deck(
+                *stacks.deck(
                     {
                         destination[leaf]: split
                         for leaf, split in half["cells"].items()
@@ -563,7 +534,7 @@ class WeakCompositionTest(Scene):
         ]
         routed = set(routes)
         bridges = [
-            _bridge(
+            bridge(
                 left["inner"][leaf].get_end(),
                 right["inner"][leaf].get_start(),
             )
@@ -593,14 +564,14 @@ class WeakCompositionTest(Scene):
         curved = VGroup()
         contracted = VGroup()
         for leaf, bridge in zip(routes, bridges):
-            route = _join_route(
+            route = join_route(
                 left["inner"][leaf], bridge, right["inner"][leaf]
             )
-            arrow = TuplePullbackTest._segment_arrow(
+            arrow = stacks.segment_arrow(
                 left["cells"][leaf].copy().shift(left_shift),
                 right["cells"][leaf].copy().shift(right_shift),
             )
-            initial, final = _matched_path_pair(route, arrow.shaft)
+            initial, final = matched_path_pair(route, arrow.shaft)
             curved.add(
                 MapstoArrow.from_parts(
                     arrow.tail.copy(), initial, right["tips"][leaf].copy()
@@ -668,10 +639,10 @@ class WeakCompositionTest(Scene):
         connectors are ``g``'s.  ``outer_cells[mode]`` is the cell the outer
         connector of that middle mode joins, or ``None`` if it has none.
         """
-        attached = TuplePullbackTest._attached
+        attached = stacks.attached
         values = refined.flatten()
         cells, fans, inner = {}, {}, {}
-        for mode, leaves in enumerate(_groups(refined, coarse)):
+        for mode, leaves in enumerate(leaf_groups(refined, coarse)):
             start = coarse_cells[mode].get_center()
             outer = outer_cells[mode]
             for index, leaf in enumerate(leaves):
@@ -683,7 +654,7 @@ class WeakCompositionTest(Scene):
                     coarse_label = cell(coarse.entry(mode + 1), start)[1]
                     split[1].set_opacity(0)
                     split.add(coarse_label)
-                TuplePullbackTest._split(
+                stacks.split_cell(
                     split,
                     alpha,
                     start,
@@ -701,7 +672,7 @@ class WeakCompositionTest(Scene):
                 # copies coincide until the cells separate.
                 if outer is not None:
                     reveal = (
-                        (lambda: _revealed(alpha.get_value()))
+                        (lambda: revealed(alpha.get_value()))
                         if index
                         else None
                     )
@@ -730,8 +701,3 @@ class WeakCompositionTest(Scene):
             Create(connector, run_time=0.95),
         )
 
-    def _clear_scene(self, *, last) -> None:
-        self.play(*(FadeOut(m) for m in self.mobjects), run_time=0.6)
-        self.clear()
-        if not last:
-            self.wait(0.2)

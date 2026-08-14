@@ -1,5 +1,7 @@
 """Prototype animation for mutual refinement of flat tuples."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from manim import (
     Create,
     CubicBezier,
@@ -9,7 +11,6 @@ from manim import (
     LEFT,
     ORIGIN,
     RIGHT,
-    Scene,
     Text,
     UP,
     VGroup,
@@ -20,7 +21,7 @@ from math import gcd
 
 from tract import NestedTuple, mutual_refinement
 
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 from layout_categories_viz.tuple_morphism import TupleMorphismDiagram
 
 
@@ -33,11 +34,10 @@ EXAMPLES = (
 )
 
 
-class TupleMorphismRefinementTest(Scene):
+class TupleMorphismRefinementTest(LayoutScene):
     """Refine two flat factorizations until one divides the other."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
 
         for source, target in EXAMPLES:
             # Validate mutual refinability before drawing the example.
@@ -212,7 +212,7 @@ class TupleMorphismRefinementTest(Scene):
 
     @staticmethod
     def _entry(value, *, center, cell_size, label_font_size):
-        return TupleMorphismDiagram._make_entries(
+        return TupleMorphismDiagram.make_entries(
             (value,), cell_size, cell_size, label_font_size
         )[0].move_to(center)
 

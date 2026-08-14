@@ -1,11 +1,13 @@
 """Create example morphisms between nested tuples."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 
-from manim import Create, FadeIn, FadeOut, LaggedStart, Scene, Text, VGroup, config
+from manim import Create, FadeIn, FadeOut, LaggedStart, Text, VGroup, config
 
 from layout_categories_viz import NestMorphismDiagram, TailToTipMapsto
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 
 @dataclass(frozen=True)
@@ -29,11 +31,10 @@ EXAMPLES = (
 )
 
 
-class NestMorphismCreateTest(Scene):
+class NestMorphismCreateTest(LayoutScene):
     """Build nested source and target trees, then their flattened morphism."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for example in EXAMPLES:
             self._show_example(example)
 

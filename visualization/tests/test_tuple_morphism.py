@@ -2,14 +2,14 @@ import numpy as np
 import pytest
 
 from manim import CubicBezier
-from tract import Tuple_morphism, compute_flat_layout_components
+from tract import TupleMorphism, compute_flat_layout_components
 
 from layout_categories_viz import MapstoArrow, TupleMorphismDiagram, compose_tuple_maps
 from layout_categories_viz.animations import _arc_length_parameterization
 from layout_categories_viz.coalesce import interpolate_mapsto_arrow
-from scenes.tuple_morphism_composition_curve import (
-    _matched_path_pair,
-    _three_segment_route,
+from layout_categories_viz.paths import (
+    matched_path_pair,
+    three_segment_route,
 )
 
 
@@ -93,10 +93,10 @@ def test_deformation_paths_have_arc_length_matched_point_correspondence():
         (11 / 3, 2, 0),
         second.shaft.get_start(),
     )
-    initial = _three_segment_route(first.shaft, connector, second.shaft)
+    initial = three_segment_route(first.shaft, connector, second.shaft)
     final = MapstoArrow((0, 0, 0), (7, -1, 0), horizontal_run=0.2).shaft
 
-    matched_initial, matched_final = _matched_path_pair(initial, final)
+    matched_initial, matched_final = matched_path_pair(initial, final)
 
     assert matched_initial.points.shape == matched_final.points.shape
     initial_lengths = np.asarray(
@@ -134,7 +134,7 @@ def test_coalesce_compaction_interpolates_arrow_control_points_directly():
 
 
 def test_flat_layout_components_match_the_displayed_prefix_products():
-    morphism = Tuple_morphism(
+    morphism = TupleMorphism(
         domain=(4, 2, 6, 5, 3, 7),
         codomain=(2, 3, 4, 5, 6),
         map=(3, 1, 5, 4, 2, 0),

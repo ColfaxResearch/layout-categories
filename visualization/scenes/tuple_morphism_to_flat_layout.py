@@ -1,5 +1,7 @@
 """Build the target prefix products of a tuple morphism, one at a time."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from manim import (
     DOWN,
     FadeIn,
@@ -9,7 +11,6 @@ from manim import (
     PURPLE,
     RIGHT,
     ReplacementTransform,
-    Scene,
     SurroundingRectangle,
     Text,
     TransformFromCopy,
@@ -21,7 +22,7 @@ from manim import (
 )
 
 from layout_categories_viz import TailToTipMapsto, TupleMorphismDiagram
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK, MUTED, PANEL
+from layout_categories_viz.style import CODE_FONT, INK, MUTED, PANEL
 
 
 DOMAIN = (4, 2, 6, 5, 3, 7)
@@ -39,11 +40,10 @@ def prefix_products(factors: tuple[int, ...]) -> tuple[int, ...]:
     return tuple(products)
 
 
-class TupleMorphismToFlatLayout(Scene):
+class TupleMorphismToFlatLayout(LayoutScene):
     """Read prefix products by gathering preceding target factors."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
 
         self._gathering_prefix_demo()
         self.wait(0.6)

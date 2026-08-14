@@ -1,5 +1,7 @@
 """Isolated study of cancelling equal, oppositely oriented Nest trees."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 import numpy as np
 from manim import (
     Create,
@@ -11,7 +13,6 @@ from manim import (
     PI,
     RIGHT,
     ReplacementTransform,
-    Scene,
     Text,
     Transform,
     Uncreate,
@@ -26,17 +27,16 @@ from layout_categories_viz.coalesce import (
     CELL_CORNER_RADIUS,
     selective_corner_box,
 )
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 
 NESTED_TUPLE = (((2, 3), (5, 7)), ((2, 5), (3, 7)))
 
 
-class NestTreeCancellationTest(Scene):
+class NestTreeCancellationTest(LayoutScene):
     """Weld matching tree levels into their common cells, root to leaves."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         cell_size = 0.069 * config.frame_height
         font_size = 28 * cell_size / (0.085 * config.frame_height)
         tree_options = dict(

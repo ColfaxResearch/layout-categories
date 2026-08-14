@@ -39,34 +39,59 @@ changes nothing but the tip, and a cell peeled off another stays invisible until
 it has moved clear, since coincident strokes would double up and darken.
 """
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 from math import prod
 
-import numpy as np
 from manim import (
     Create,
-    CubicBezier,
     DOWN,
     FadeIn,
     FadeOut,
     LEFT,
-    Line,
-    RIGHT,
-    RoundedRectangle,
     ORIGIN,
-    Scene,
     Succession,
     Text,
-    UP,
     ValueTracker,
     VGroup,
     smooth,
 )
-from tract import NestedTuple, Nest_morphism
+from tract import NestedTuple, NestMorphism
 
 from layout_categories_viz.animations import DrawMapstoTip, UndrawMapstoTip
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK, PANEL
-from layout_categories_viz.tuple_morphism import MapstoArrow
+from layout_categories_viz.style import CODE_FONT, INK
+
+# The library owns the drawing primitives every refinement animation shares,
+# so they cannot drift apart.
+from layout_categories_viz.stacks import (
+    ARROW_INSET,
+    ARROW_RUN,
+    CELL_H,
+    FONT_SIZE,
+    LABEL_FONT_SIZE,
+    LEFT_X,
+    MAX_STACK_HEIGHT,
+    MID_X,
+    REVEAL,
+    RIGHT_X,
+    ROW_GAP,
+    SLOT_STEP,
+    STROKE_WIDTH,
+    TAIL_LENGTH,
+    TIP_LENGTH,
+    TIP_WIDTH,
+    arrow_tip,
+    attached,
+    cell,
+    deck,
+    leaf_groups,
+    make_place,
+    revealed,
+    segment_arrow,
+    split_cell,
+    tree_segment,
+)
 
 
 @dataclass(frozen=True)
@@ -128,64 +153,35 @@ EXAMPLES = (
     PullbackExample(((2, 3), (5,), (2, 2)), (3, 0, 1), domain=(4, 7, 6)),
 )
 
-CELL_H = 0.7
-ROW_GAP = 0.2  # uniform gap between adjacent cells in any stack
-FONT_SIZE = 30
-LABEL_FONT_SIZE = 30
-STROKE_WIDTH = 3.6
-TIP_LENGTH = 0.2
-TIP_WIDTH = 0.18
-ARROW_INSET = 0.08  # matches MapstoArrow's endpoint_inset default
-# Every connector ends with a straight horizontal run, so a caret drawn at its
-# end is approached horizontally however far the connector has climbed.  The run
-# sits at the end a tip would: a fan diverging out of one cell still separates at
-# once, and one converging into a cell merges over this last stretch.
-ARROW_RUN = 0.35
-TAIL_LENGTH = 0.22  # the bar of a |-> arrow, drawn invisibly here
-MAX_STACK_HEIGHT = 6.3  # taller examples are scaled down to fit the frame
-# A cell peeled off a splitting cell is invisible until it has moved clear of
-# it: coincident strokes would otherwise double up and darken at that instant.
-REVEAL = 0.3
-
-LEFT_X = -3.6
-MID_X = 0.0
-RIGHT_X = 3.6
-SLOT_STEP = CELL_H + ROW_GAP
+# Backward-compatible aliases for the primitives' old private names.
+_groups = leaf_groups
+_revealed = revealed
 
 
-def _groups(refined: NestedTuple, coarse: NestedTuple) -> tuple:
-    """Leaf indices of ``refined`` under each mode of ``coarse``, zero-based."""
-    return tuple(
-        tuple(
-            range(
-                refined.sublength(index, coarse),
-                refined.sublength(index, coarse)
-                + refined.relative_mode(index, coarse).length(),
-            )
-        )
-        for index in range(1, coarse.length() + 1)
-    )
-
-
-def _revealed(value: float) -> float:
-    """How much of a peeled copy is showing, once the motion has begun."""
-    return min(1.0, value / REVEAL)
-
-
-class TuplePullbackTest(Scene):
+class TuplePullbackTest(LayoutScene):
     """Deform 'morphism then refinement' into 'refinement then morphism'."""
 
+    # Backward-compatible aliases: the primitives moved to
+    # layout_categories_viz.stacks, and subclasses and sibling scenes still
+    # reach them through this class under their old names.
+    _cell = staticmethod(cell)
+    _deck = staticmethod(deck)
+    _split = staticmethod(split_cell)
+    _attached = staticmethod(attached)
+    _segment_arrow = staticmethod(segment_arrow)
+    _tree_segment = staticmethod(tree_segment)
+    _arrow_tip = staticmethod(arrow_tip)
+
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._show_pullback(example)
-            self._clear_scene(last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _show_pullback(self, example: PullbackExample) -> None:
         S = NestedTuple(example.resolved_domain())
         T = NestedTuple(example.codomain)
         Tprime = NestedTuple(example.refinement)
-        f = Nest_morphism(S, T, example.mapping)
+        f = NestMorphism(S, T, example.mapping)
         fprime = f.pullback_along(Tprime)
         Sprime = fprime.domain
         t_groups = _groups(Tprime, T)
@@ -198,9 +194,7 @@ class TuplePullbackTest(Scene):
         )
         step = SLOT_STEP * scale
         baseline = -((slots - 1) * step) / 2
-
-        def place(column, index):
-            return np.array((column, baseline + index * step, 0.0))
+        place = make_place(baseline, step)
 
         def cell(value, center):
             return self._cell(value, ORIGIN).scale(scale).move_to(center)
@@ -406,143 +400,3 @@ class TuplePullbackTest(Scene):
             mobject.clear_updaters()
         self.wait(1.8)
 
-    def _clear_scene(self, *, last) -> None:
-        self.play(*(FadeOut(m) for m in self.mobjects), run_time=0.6)
-        self.clear()
-        if not last:
-            self.wait(0.2)
-
-    # ------------------------------------------------------------------ utils
-    @classmethod
-    def _segment_arrow(cls, source_cell, target_cell):
-        """A map arrow whose shaft is exactly a refinement segment.
-
-        Sharing the segment's curvature is what lets an arrow be replaced by the
-        fan it splits into without any snap: only the caret differs.
-        """
-        shaft = cls._tree_segment(
-            source_cell.get_right(), target_cell.get_left()
-        )
-        tip = cls._arrow_tip(target_cell.get_left() + LEFT * ARROW_INSET)
-        start = shaft.get_start()
-        tail = Line(
-            start + DOWN * TAIL_LENGTH / 2,
-            start + UP * TAIL_LENGTH / 2,
-            color=INK,
-            stroke_width=STROKE_WIDTH,
-        ).set_opacity(0)
-        return MapstoArrow.from_parts(tail, shaft, tip)
-
-    @classmethod
-    def _attached(cls, source, target, *, reveal=None):
-        """A connector that follows both of the cells it joins.
-
-        ``reveal`` is a callable returning how much of the connector is showing.
-        A connector that starts out coincident with one already on screen uses it
-        to fade in, since coincident strokes would double up and darken.
-        """
-        connector = cls._tree_segment(source.get_right(), target.get_left())
-        if reveal is not None:
-            # Stroke only: a connector is an open bezier, and giving it fill
-            # opacity would flood the area its curve encloses.
-            connector.set_stroke(opacity=0)
-
-        def update(mobject):
-            mobject.become(
-                cls._tree_segment(source.get_right(), target.get_left())
-            )
-            if reveal is not None:
-                mobject.set_stroke(opacity=reveal())
-
-        connector.add_updater(update)
-        return connector
-
-    @staticmethod
-    def _split(split, alpha, start, end, *, peeled):
-        """Send a cell to its slot in T', shedding the coarse value.
-
-        A cell that is peeled off another is one of a stack of cells sitting
-        under it, carrying its own value from the outset: it is drawn behind (see
-        ``_deck``), so it is simply hidden by the cell in front until it slides
-        clear of it.  The cell that stands in for the one they all came from is
-        the only one that has a coarse value to shed.
-        """
-        box, factor_label, *carried = split
-
-        def update(mobject):
-            value = alpha.get_value()
-            mobject.move_to(start + (end - start) * value)
-            if not peeled:
-                factor_label.set_opacity(value)
-                carried[0].set_opacity(1.0 - value)
-
-        split.add_updater(update)
-
-    @staticmethod
-    def _deck(cells):
-        """A stack's cells in drawing order, lowest in front.
-
-        The cells of a mode start out stacked under the one they come from, so
-        every cell has to be drawn behind the cells below it: then a cell rising
-        into its slot slides out from underneath rather than over the top.
-        """
-        return tuple(cells[leaf] for leaf in sorted(cells, reverse=True))
-
-    @staticmethod
-    def _cell(value, center):
-        box = RoundedRectangle(
-            corner_radius=0.08,
-            width=CELL_H,
-            height=CELL_H,
-            stroke_color=INK,
-            stroke_width=1.8,
-            fill_color=PANEL,
-            fill_opacity=1,
-        )
-        label = Text(str(value), color=INK, font=CODE_FONT, font_size=FONT_SIZE)
-        label.move_to(box)
-        return VGroup(box, label).move_to(center)
-
-    @staticmethod
-    def _arrow_tip(tip_point):
-        """A rightward caret matching MapstoArrow's tip, at ``tip_point``."""
-        return VGroup(
-            Line(
-                tip_point,
-                tip_point - RIGHT * TIP_LENGTH + UP * TIP_WIDTH / 2,
-                color=INK,
-                stroke_width=STROKE_WIDTH,
-            ),
-            Line(
-                tip_point,
-                tip_point - RIGHT * TIP_LENGTH - UP * TIP_WIDTH / 2,
-                color=INK,
-                stroke_width=STROKE_WIDTH,
-            ),
-        )
-
-    @staticmethod
-    def _tree_segment(start, end):
-        # Inset both ends by ARROW_INSET, exactly like a morphism arrow's tail
-        # and tip, so segment <-> arrow is only a matter of the tip.  The bend
-        # arrives horizontally at the start of the closing run, which the caret
-        # of an arrow then sits at the far end of.
-        start = start.copy()
-        end = end.copy()
-        direction = RIGHT if end[0] >= start[0] else LEFT
-        start = start + direction * ARROW_INSET
-        end = end - direction * ARROW_INSET
-        span = abs(end[0] - start[0])
-        run = min(ARROW_RUN, 0.45 * span)
-        turn = end - direction * run
-        handle = direction * 0.42 * abs(turn[0] - start[0])
-        segment = CubicBezier(
-            start,
-            start + handle,
-            turn - handle,
-            turn,
-            color=INK,
-            stroke_width=STROKE_WIDTH,
-        )
-        segment.add_line_to(end)
-        return segment

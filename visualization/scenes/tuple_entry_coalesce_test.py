@@ -1,5 +1,7 @@
 """Isolated playground for tuple-entry coalesce gestures."""
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from math import prod
 
 import numpy as np
@@ -11,7 +13,6 @@ from manim import (
     ManimColor,
     ORIGIN,
     ReplacementTransform,
-    Scene,
     Text,
     Transform,
     Uncreate,
@@ -23,7 +24,7 @@ from manim import (
     smooth,
 )
 
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 
 EXAMPLES = (
@@ -38,11 +39,10 @@ ENTRY_HOLD = 0.7
 RESULT_HOLD = 1.7
 
 
-class TupleEntryCoalesceTest(Scene):
+class TupleEntryCoalesceTest(LayoutScene):
     """Weld cells by sharpening only the corners that become interior."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
 
         for values in EXAMPLES:
             self._play_example(values)

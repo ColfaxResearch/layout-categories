@@ -7,7 +7,7 @@ own factors with no cell ever changing places.  Everything else those scenes dra
 be judged on its own.
 
 It is the gesture those scenes actually use, not a variant: the cells come from
-``TuplePullbackTest._cell`` and the motion from ``TuplePullbackTest._split``, so
+``stacks.cell`` and the motion from ``stacks.split_cell``, so
 whatever is tuned here changes what they draw.  As it stands, the cells of a mode
 all start on the cell they come from and each travels to its slot while the coarse
 value it carried fades out and its own factor fades in.  The first cell of a mode
@@ -19,8 +19,10 @@ everything above it up, which is why a cell high in the stack can travel several
 slots without splitting at all.
 
 The knobs: ``SPLIT_RUN_TIME`` here, ``REVEAL`` in the pullback scene, the rate
-function the motion is played with, and ``TuplePullbackTest._split`` itself.
+function the motion is played with, and ``stacks.split_cell`` itself.
 """
+
+from layout_categories_viz.scene_base import LayoutScene
 
 from math import prod
 
@@ -30,21 +32,20 @@ from manim import (
     FadeIn,
     FadeOut,
     ORIGIN,
-    Scene,
     Text,
     ValueTracker,
     smooth,
 )
 from tract import NestedTuple
 
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
-from scenes.tuple_pullback_test import (
+from layout_categories_viz.style import CODE_FONT, INK
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import (
     CELL_H,
     LABEL_FONT_SIZE,
     MAX_STACK_HEIGHT,
     SLOT_STEP,
-    TuplePullbackTest,
-    _groups,
+    leaf_groups,
 )
 
 
@@ -65,14 +66,13 @@ SPLIT_RUN_TIME = 1.4  # as stage 1 of the pullback and the pushforward plays it
 ZOOM = 1.8
 
 
-class TupleCellSplitTest(Scene):
+class TupleCellSplitTest(LayoutScene):
     """Refine a stack of cells in place, and nothing else."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, modes in enumerate(EXAMPLES):
             self._show_split(modes)
-            self._clear_scene(last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _show_split(self, modes) -> None:
         coarse = NestedTuple(tuple(prod(factors) for factors in modes))
@@ -96,7 +96,7 @@ class TupleCellSplitTest(Scene):
 
         def cell(value, center):
             return (
-                TuplePullbackTest._cell(value, ORIGIN)
+                stacks.cell(value, ORIGIN)
                 .scale(scale)
                 .move_to(center)
             )
@@ -123,7 +123,7 @@ class TupleCellSplitTest(Scene):
 
         alpha = ValueTracker(0.0)
         splits = {}
-        for mode, leaves in enumerate(_groups(refined, coarse)):
+        for mode, leaves in enumerate(leaf_groups(refined, coarse)):
             start = coarse_cells[mode].get_center()
             for index, leaf in enumerate(leaves):
                 # The first cell of a mode stands in for the cell it came from,
@@ -134,7 +134,7 @@ class TupleCellSplitTest(Scene):
                     carried = cell(coarse.entry(mode + 1), start)[1]
                     split[1].set_opacity(0)
                     split.add(carried)
-                TuplePullbackTest._split(
+                stacks.split_cell(
                     split, alpha, start, place(leaf), peeled=bool(index)
                 )
                 splits[leaf] = split
@@ -142,7 +142,7 @@ class TupleCellSplitTest(Scene):
         # The cells that stand in for the coarse ones are coincident with them,
         # and the rest are stacked under them: lowest in front.
         self.remove(*coarse_cells)
-        self.add(*TuplePullbackTest._deck(splits))
+        self.add(*stacks.deck(splits))
 
         label_refined = label("T'", cell(values[0], place(0)))
         self.play(
@@ -156,8 +156,3 @@ class TupleCellSplitTest(Scene):
             split.clear_updaters()
         self.wait(1.6)
 
-    def _clear_scene(self, *, last) -> None:
-        self.play(*(FadeOut(m) for m in self.mobjects), run_time=0.6)
-        self.clear()
-        if not last:
-            self.wait(0.2)

@@ -46,25 +46,22 @@ block (junctions and all), and a Y cell sent to the basepoint by g takes
 its route with it when Y dissolves.  The first backward leg's top-level
 modes are kept as tuples, so each graft junction is present in the
 composite.  The library supplies every stack and map:
-``pullback_with_refinement`` gives X', b' and f', ``RefSpan_morphism.compose``
+``pullback_with_refinement`` gives X', b' and f', ``RefSpanMorphism.compose``
 the picture being landed on.
 """
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 
-import numpy as np
 from manim import (
     Create,
     FadeIn,
     FadeOut,
     LaggedStart,
     LEFT,
-    ORIGIN,
     RIGHT,
-    Scene,
     ShrinkToCenter,
-    Succession,
-    Text,
     Transform,
     Uncreate,
     ValueTracker,
@@ -72,41 +69,38 @@ from manim import (
     Write,
     smooth,
 )
-from tract import NestedTuple, Ref_morphism, RefSpan_morphism, Tuple_morphism
+from tract import NestedTuple, RefMorphism, RefSpanMorphism, TupleMorphism
 
 from layout_categories_viz.animations import (
     DrawMapstoTip,
     TailToTipMapsto,
     UndrawMapstoTip,
 )
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
 
 # The composition scene owns the route-surgery helpers, the pullback scene
 # the drawing primitives and the two-stage gesture, the weak-composition
 # scene the bridging, and the Ref create scene the banded trees, so this
 # scene cannot drift from any of them.
-from scenes.ref_morphism_create_test import ref_tree_with_paths
-from scenes.tuple_morphism_composition_curve import _matched_path_pair
-from scenes.tuple_pullback_test import (
-    ARROW_INSET,
-    CELL_H,
-    LABEL_FONT_SIZE,
-    MAX_STACK_HEIGHT,
-    SLOT_STEP,
-    TuplePullbackTest,
-    _revealed,
+from layout_categories_viz.ref_trees import ref_tree_with_paths
+from layout_categories_viz.paths import matched_path_pair
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import ARROW_INSET
+from layout_categories_viz.paths import bridge, join_route
+from scenes.span_common import (
+    COL_S,
+    COL_T,
+    COL_U,
+    COL_X,
+    COL_Y,
+    CONTRACTION,
+    build_basepoint_arrivals,
+    build_middle_splits,
+    composition_labels,
+    span_geometry,
 )
-from scenes.weak_composition_test import _bridge, _join_route
-
-COLUMN_GAP = 3.0
-COL_S, COL_X, COL_T, COL_Y, COL_U = ((index - 2) * COLUMN_GAP for index in range(5))
-# The composite span occupies the footprint of a single span: the outer
-# stacks come in by one column pitch each and the refined apex, already in
-# the middle, stays put.
-CONTRACTION = COLUMN_GAP
 
 
-def _backward_forest(morphism: Ref_morphism, root_cells, leaf_cells):
+def _backward_forest(morphism: RefMorphism, root_cells, leaf_cells):
     """A backward leg's mirrored banded trees, with edge and path data.
 
     The morphism points leaf_cells ↠ root_cells: leaves anchor on the LEFT
@@ -157,7 +151,7 @@ def _rightward_route(path) -> "VGroup":
         piece = strand.copy()
         piece.reverse_points()
         pieces.append(piece)
-    return _join_route(*pieces)
+    return join_route(*pieces)
 
 
 @dataclass(frozen=True)
@@ -173,15 +167,15 @@ class RefSpanCompositionExample:
 
     def spans(self) -> tuple:
         """The spans f and g, validated by the library."""
-        first_left = Ref_morphism(NestedTuple(self.first_nest))
-        first = RefSpan_morphism(
+        first_left = RefMorphism(NestedTuple(self.first_nest))
+        first = RefSpanMorphism(
             first_left,
-            Tuple_morphism(first_left.domain, self.middle, self.first_map),
+            TupleMorphism(first_left.domain, self.middle, self.first_map),
         )
-        second_left = Ref_morphism(NestedTuple(self.second_nest))
-        second = RefSpan_morphism(
+        second_left = RefMorphism(NestedTuple(self.second_nest))
+        second = RefSpanMorphism(
             second_left,
-            Tuple_morphism(second_left.domain, self.codomain, self.second_map),
+            TupleMorphism(second_left.domain, self.codomain, self.second_map),
         )
         return first, second
 
@@ -214,14 +208,13 @@ EXAMPLES = (
 )
 
 
-class RefSpanMorphismCompositionTest(Scene):
+class RefSpanMorphismCompositionTest(LayoutScene):
     """Pull the middle Tuple past the middle Ref, then compose like pairs."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._play_example(example)
-            TuplePullbackTest._clear_scene(self, last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _play_example(self, example: RefSpanCompositionExample) -> None:
         first, second = example.spans()
@@ -254,48 +247,19 @@ class RefSpanMorphismCompositionTest(Scene):
             if pulled.map[leaf]
         }
 
-        # Geometry: one bottom baseline, one uniform step, scaled to fit.
-        slots = max(
+        geometry = span_geometry(
             len(first.domain),
             len(first.apex),
             len(second.apex),
             len(refinement.domain),
             len(composite.codomain),
         )
-        scale = min(1.0, MAX_STACK_HEIGHT / ((slots - 1) * SLOT_STEP + CELL_H))
-        step = SLOT_STEP * scale
+        place = geometry.place
+        cell = geometry.cell
+        stack_label = geometry.stack_label
+        leg_label = geometry.leg_label
 
-        def place(column, index):
-            return np.array(
-                (column, -((slots - 1) * step) / 2 + index * step + 0.45, 0.0)
-            )
-
-        def cell(value, center):
-            return (
-                TuplePullbackTest._cell(value, ORIGIN)
-                .scale(scale)
-                .move_to(center)
-            )
-
-        stack_label_y = place(0, 0)[1] - CELL_H * scale / 2 - 0.42
-        leg_label_y = stack_label_y - 0.62
-
-        def stack_label(text, column):
-            return (
-                Text(text, color=INK, font=CODE_FONT, font_size=LABEL_FONT_SIZE)
-                .scale(scale)
-                .move_to(np.array([column, stack_label_y, 0.0]))
-            )
-
-        def leg_label(text, x):
-            return (
-                Text(text, color=INK, font=CODE_FONT, font_size=28)
-                .scale(scale)
-                .move_to(np.array([x, leg_label_y, 0.0]))
-            )
-
-        segment = TuplePullbackTest._tree_segment
-        attached = TuplePullbackTest._attached
+        segment = stacks.tree_segment
 
         # --- Open: both spans, trees backward and arrows forward. ------------
         u_cells = [
@@ -326,12 +290,12 @@ class RefSpanMorphismCompositionTest(Scene):
             second.left, v_cells, y_cells
         )
         first_arrows = {
-            i: TuplePullbackTest._segment_arrow(x_cells[i], v_cells[j - 1])
+            i: stacks.segment_arrow(x_cells[i], v_cells[j - 1])
             for i, j in enumerate(first.right.map)
             if j
         }
         second_arrows = {
-            m: TuplePullbackTest._segment_arrow(y_cells[m], w_cells[k - 1])
+            m: stacks.segment_arrow(y_cells[m], w_cells[k - 1])
             for m, k in enumerate(second.right.map)
             if k
         }
@@ -407,7 +371,7 @@ class RefSpanMorphismCompositionTest(Scene):
         unbraid_initial = VGroup()
         unbraid_final = VGroup()
         for m in sorted(second_fans):
-            initial, final = _matched_path_pair(
+            initial, final = matched_path_pair(
                 _rightward_route(second_paths[m]), second_fans[m]
             )
             unbraid_initial.add(initial)
@@ -426,34 +390,18 @@ class RefSpanMorphismCompositionTest(Scene):
         # leg, exactly the Fact span gesture: f's arrows fan out into the
         # blocks; the strands to Y become parallel, cell for cell.
         alpha = ValueTracker(0.0)
-        middle_cells, middle_fans, connectors = {}, {}, {}
-        for mode, leaves in enumerate(y_groups):
-            start_center = v_cells[mode].get_center()
-            for index, leaf in enumerate(leaves):
-                split = cell(second.apex[leaf], start_center)
-                if not index:
-                    coarse = cell(first.codomain[mode], start_center)[1]
-                    split[1].set_opacity(0)
-                    split.add(coarse)
-                TuplePullbackTest._split(
-                    split,
-                    alpha,
-                    start_center,
-                    place(COL_T, leaf),
-                    peeled=bool(index),
-                )
-                middle_cells[leaf] = split
-                if mode in source_apex:
-                    middle_fans[leaf] = attached(
-                        x_cells[source_apex[mode]],
-                        split,
-                        reveal=(
-                            (lambda: _revealed(alpha.get_value()))
-                            if index
-                            else None
-                        ),
-                    )
-                connectors[leaf] = attached(split, y_cells[leaf])
+        middle_cells, middle_fans, connectors = build_middle_splits(
+            first=first,
+            second=second,
+            y_groups=y_groups,
+            v_cells=v_cells,
+            x_cells=x_cells,
+            y_cells=y_cells,
+            source_apex=source_apex,
+            alpha=alpha,
+            cell=cell,
+            place=place,
+        )
 
         # Every replacement starts out coincident with what it replaces.
         # The middle is becoming a second copy of Y, cell for cell.
@@ -464,7 +412,7 @@ class RefSpanMorphismCompositionTest(Scene):
             *(arrow.tail for arrow in first_arrows.values()),
         )
         self.add(*middle_fans.values(), *connectors.values())
-        self.add(*TuplePullbackTest._deck(middle_cells))
+        self.add(*stacks.deck(middle_cells))
         label_y_middle = stack_label("Y", COL_T)
         self.play(
             alpha.animate.set_value(1.0),
@@ -479,7 +427,7 @@ class RefSpanMorphismCompositionTest(Scene):
         # The parallel connectors take carets: they are becoming f', whose
         # carets they keep through the reordering.
         tips = {
-            leaf: TuplePullbackTest._arrow_tip(
+            leaf: stacks.arrow_tip(
                 y_cells[leaf].get_left() + LEFT * ARROW_INSET
             )
             for leaf in middle_cells
@@ -498,7 +446,7 @@ class RefSpanMorphismCompositionTest(Scene):
             connectors[leaf].clear_updaters()
         self.add(*(middle_cells[leaf] for leaf in retiring))
         self.add(
-            *TuplePullbackTest._deck(
+            *stacks.deck(
                 {
                     destination[leaf]: middle_cells[leaf]
                     for leaf in middle_cells
@@ -518,21 +466,14 @@ class RefSpanMorphismCompositionTest(Scene):
         # An apex cell sent to the basepoint has no block to reorder: it
         # carries its own value into X', arriving with a strand and no
         # arrow.
-        arrival_cells, arrival_fans, arrivals = {}, {}, []
-        for i, target in enumerate(first.right.map):
-            if target:
-                continue
-            for leaf in xprime_groups[i]:
-                joined = cell(refinement.domain[leaf], place(COL_T, leaf))
-                fan = segment(x_cells[i].get_right(), joined.get_left())
-                arrival_cells[leaf] = joined
-                arrival_fans[leaf] = fan
-                arrivals.append(
-                    Succession(
-                        FadeIn(joined, run_time=0.45),
-                        Create(fan, run_time=0.95),
-                    )
-                )
+        arrival_cells, arrival_fans, arrivals = build_basepoint_arrivals(
+            first=first,
+            refinement=refinement,
+            xprime_groups=xprime_groups,
+            x_cells=x_cells,
+            cell=cell,
+            place=place,
+        )
 
         self.play(
             *reorder,
@@ -575,7 +516,7 @@ class RefSpanMorphismCompositionTest(Scene):
         rebraid_initial = VGroup()
         rebraid_final = VGroup()
         for leaf in range(len(refinement.domain)):
-            initial, final = _matched_path_pair(
+            initial, final = matched_path_pair(
                 left_strands[leaf], _rightward_route(bprime_paths[leaf])
             )
             rebraid_initial.add(initial)
@@ -633,34 +574,27 @@ class RefSpanMorphismCompositionTest(Scene):
                 if len(address) == 1
             ).get_end()
             leaf_start = first_paths[i][0].points[0]
-            left_bridges[i] = _bridge(root_end, leaf_start)
+            left_bridges[i] = bridge(root_end, leaf_start)
         right_bridges = {}
         for leaf, m in surviving.items():
-            right_bridges[leaf] = _bridge(
+            right_bridges[leaf] = bridge(
                 right_strands[leaf].get_end(),
                 second_arrows[m].shaft.get_start(),
             )
 
         # The adjacent Ref labels slide together, and so do the Tuples',
-        # landing mid-gap of the contracted span.
-        left_reference = Text(
-            "a ∘ b′", color=INK, font=CODE_FONT, font_size=28
-        ).scale(scale)
-        left_reference.move_to(
-            np.array([(COL_S + CONTRACTION + COL_T) / 2, leg_label_y, 0.0])
-        )
-        right_reference = Text(
-            "g ∘ f′", color=INK, font=CODE_FONT, font_size=28
-        ).scale(scale)
-        right_reference.move_to(
-            np.array([(COL_T + COL_U - CONTRACTION) / 2, leg_label_y, 0.0])
-        )
-        # Text submobjects include space glyphs: "a ∘ b′" splits into
+        # landing mid-gap of the contracted span.  "a ∘ b′" splits into
         # a,␣,∘,␣,b,′ and "g ∘ f′" into g,␣,∘,␣,f,′.
-        left_symbol = Text("∘", color=INK, font=CODE_FONT, font_size=28)
-        left_symbol.scale(scale).move_to(left_reference[2])
-        right_symbol = Text("∘", color=INK, font=CODE_FONT, font_size=28)
-        right_symbol.scale(scale).move_to(right_reference[2])
+        left_reference, right_reference, left_symbol, right_symbol = (
+            composition_labels(
+                "a ∘ b′",
+                "g ∘ f′",
+                scale=geometry.scale,
+                leg_label_y=geometry.leg_label_y,
+                left_symbol_index=2,
+                right_symbol_index=2,
+            )
+        )
 
         self.play(
             *(Create(bridge) for bridge in left_bridges.values()),
@@ -687,7 +621,7 @@ class RefSpanMorphismCompositionTest(Scene):
         final_routes = VGroup()
 
         def add_pair(initial_piece, final_piece):
-            initial, final = _matched_path_pair(initial_piece, final_piece)
+            initial, final = matched_path_pair(initial_piece, final_piece)
             initial_routes.add(initial)
             final_routes.add(final)
 
@@ -705,7 +639,7 @@ class RefSpanMorphismCompositionTest(Scene):
                 # edge, exactly a Fact route.
                 (single,) = bprime_edges[i].values()
                 add_pair(
-                    _join_route(single, left_bridges[i], leaf_edge),
+                    join_route(single, left_bridges[i], leaf_edge),
                     composite_edges[k][leaf_address],
                 )
                 continue
@@ -713,7 +647,7 @@ class RefSpanMorphismCompositionTest(Scene):
             # fuses onto a's leaf strand, and b''s edges keep their
             # addresses under the graft prefix.
             add_pair(
-                _join_route(left_bridges[i], leaf_edge),
+                join_route(left_bridges[i], leaf_edge),
                 composite_edges[k][leaf_address],
             )
             for beta, strand in bprime_edges[i].items():
@@ -727,7 +661,7 @@ class RefSpanMorphismCompositionTest(Scene):
             leaf: second_arrows[m] for leaf, m in surviving.items()
         }
         for leaf, arrow in surviving_arrows.items():
-            glued = _join_route(
+            glued = join_route(
                 right_strands[leaf], right_bridges[leaf], arrow.shaft
             )
             target = composite.right.map[leaf]

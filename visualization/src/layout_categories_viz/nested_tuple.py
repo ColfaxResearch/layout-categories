@@ -60,7 +60,7 @@ class NestedTupleTree(VGroup):
                 1.0,
                 2.1 / len(str(node.value)),
             )
-            node.mobject = TupleMorphismDiagram._make_entries(
+            node.mobject = TupleMorphismDiagram.make_entries(
                 (node.value,),
                 cell_size,
                 cell_size,

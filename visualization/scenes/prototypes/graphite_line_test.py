@@ -22,12 +22,12 @@ The scene shows the same three connectors in ink and in graphite, then a whole
 morphism in graphite, then the tuning: light, standard, and bold.
 """
 
+from layout_categories_viz.scene_base import LayoutScene
+
 import numpy as np
 from manim import (
     Create,
     FadeIn,
-    FadeOut,
-    Scene,
     Text,
     ValueTracker,
     VGroup,
@@ -35,11 +35,11 @@ from manim import (
     rate_functions,
 )
 
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
-from scenes.tuple_pullback_test import (
+from layout_categories_viz.style import CODE_FONT, INK
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import (
     SLOT_STEP,
     STROKE_WIDTH,
-    TuplePullbackTest,
 )
 
 
@@ -185,17 +185,16 @@ def settle_graphite(strokes: VGroup) -> None:
             piece.clear_updaters()
 
 
-class GraphiteLineTest(Scene):
+class GraphiteLineTest(LayoutScene):
     """The same connectors in ink and in graphite, and the tuning."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         self._compare()
-        self._clear_scene()
+        self.clear_scene()
         self._in_context()
-        self._clear_scene()
+        self.clear_scene()
         self._tuning()
-        self._clear_scene(last=True)
+        self.clear_scene(last=True)
 
     # ------------------------------------------------------------------ beats
     def _compare(self) -> None:
@@ -230,7 +229,7 @@ class GraphiteLineTest(Scene):
 
     def _in_context(self) -> None:
         """A morphism with every connector drawn in graphite."""
-        cell = TuplePullbackTest._cell
+        cell = stacks.cell
         left = [
             cell(value, np.array((-3.0, y, 0.0)))
             for value, y in ((6, -SLOT_STEP), (12, 0.0), (4, SLOT_STEP))
@@ -240,7 +239,7 @@ class GraphiteLineTest(Scene):
             for value, y in ((12, -SLOT_STEP), (4, 0.0), (6, SLOT_STEP))
         ]
         arrows = [
-            TuplePullbackTest._segment_arrow(left[source], right[target])
+            stacks.segment_arrow(left[source], right[target])
             for source, target in ((0, 2), (1, 0), (2, 1))
         ]
         self.play(*(FadeIn(box) for box in (*left, *right)), run_time=0.6)
@@ -280,7 +279,7 @@ class GraphiteLineTest(Scene):
         )
         for index, (label, options) in enumerate(settings):
             offset = 1.7 - 1.7 * index
-            connector = TuplePullbackTest._tree_segment(
+            connector = stacks.tree_segment(
                 np.array((-3.4, offset - 0.35, 0.0)),
                 np.array((3.4, offset + 0.35, 0.0)),
             )
@@ -295,7 +294,7 @@ class GraphiteLineTest(Scene):
     @staticmethod
     def _connectors(offset: float):
         """A fan segment, a steep one, and a map arrow's shaft."""
-        segment = TuplePullbackTest._tree_segment
+        segment = stacks.tree_segment
         return VGroup(
             segment(
                 np.array((-4.4, offset, 0.0)), np.array((-1.2, offset, 0.0))
@@ -304,9 +303,9 @@ class GraphiteLineTest(Scene):
                 np.array((-0.8, offset - 0.5, 0.0)),
                 np.array((1.6, offset + 0.7, 0.0)),
             ),
-            TuplePullbackTest._segment_arrow(
-                TuplePullbackTest._cell(2, np.array((2.4, offset, 0.0))),
-                TuplePullbackTest._cell(2, np.array((5.2, offset + 0.4, 0.0))),
+            stacks.segment_arrow(
+                stacks.cell(2, np.array((2.4, offset, 0.0))),
+                stacks.cell(2, np.array((5.2, offset + 0.4, 0.0))),
             ).shaft,
         )
 
@@ -316,8 +315,3 @@ class GraphiteLineTest(Scene):
             np.array((-5.6, y, 0.0))
         )
 
-    def _clear_scene(self, *, last: bool = False) -> None:
-        self.play(*(FadeOut(m) for m in self.mobjects), run_time=0.6)
-        self.clear()
-        if not last:
-            self.wait(0.2)

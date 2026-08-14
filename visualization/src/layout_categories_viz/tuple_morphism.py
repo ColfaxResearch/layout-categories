@@ -119,7 +119,7 @@ class TupleMorphismDiagram(VGroup):
 
     Parameters use the repository's one-based map convention: ``0`` means
     ``*`` and values from ``1`` through ``len(codomain)`` select target modes.
-    Nonzero entries must be distinct, matching ``Fin_morphism``.
+    Nonzero entries must be distinct, matching ``FinMorphism``.
     """
 
     def __init__(
@@ -145,10 +145,10 @@ class TupleMorphismDiagram(VGroup):
         self.mapping = tuple(mapping)
         self._validate()
 
-        self.source_entries = self._make_entries(
+        self.source_entries = self.make_entries(
             self.domain, entry_width, entry_height, label_font_size
         )
-        self.target_entries = self._make_entries(
+        self.target_entries = self.make_entries(
             self.codomain, entry_width, entry_height, label_font_size
         )
         # Tuple coordinates are read bottom to top: the first component sits
@@ -163,7 +163,7 @@ class TupleMorphismDiagram(VGroup):
         for source_index, target_index in enumerate(self.mapping):
             if target_index == 0:
                 continue
-            arrow = self._mapsto_arrow(
+            arrow = self.mapsto_arrow(
                 self.source_entries[source_index].get_right(),
                 self.target_entries[target_index - 1].get_left(),
                 endpoint_inset=arrow_endpoint_inset,
@@ -205,7 +205,7 @@ class TupleMorphismDiagram(VGroup):
                 raise ValueError("mapped source and target entries must have equal values")
 
     @staticmethod
-    def _make_entries(
+    def make_entries(
         values: Sequence[int], width: float, height: float, font_size: float
     ) -> VGroup:
         entries = VGroup()
@@ -225,7 +225,7 @@ class TupleMorphismDiagram(VGroup):
         return entries
 
     @staticmethod
-    def _mapsto_arrow(
+    def mapsto_arrow(
         start: np.ndarray,
         end: np.ndarray,
         *,
@@ -247,6 +247,10 @@ class TupleMorphismDiagram(VGroup):
             horizontal_run=horizontal_run,
             bend_handle=bend_handle,
         )
+
+    # Backwards-compatible aliases for the former private names.
+    _make_entries = make_entries
+    _mapsto_arrow = mapsto_arrow
 
     def source_entry(self, index: int) -> VGroup:
         """Return a source entry using the public, one-based convention."""

@@ -58,13 +58,13 @@ class TupleMorphismCompositionDiagram(VGroup):
             self.first_mapping, self.second_mapping
         )
 
-        self.source_entries = TupleMorphismDiagram._make_entries(
+        self.source_entries = TupleMorphismDiagram.make_entries(
             self.domain, entry_width, entry_height, label_font_size
         )
-        self.intermediate_entries = TupleMorphismDiagram._make_entries(
+        self.intermediate_entries = TupleMorphismDiagram.make_entries(
             self.intermediate, entry_width, entry_height, label_font_size
         )
-        self.target_entries = TupleMorphismDiagram._make_entries(
+        self.target_entries = TupleMorphismDiagram.make_entries(
             self.codomain, entry_width, entry_height, label_font_size
         )
         for entries in (
@@ -143,7 +143,7 @@ class TupleMorphismCompositionDiagram(VGroup):
         for source_index, target_index in enumerate(mapping):
             if target_index:
                 arrows.add(
-                    TupleMorphismDiagram._mapsto_arrow(
+                    TupleMorphismDiagram.mapsto_arrow(
                         source[source_index].get_right(),
                         target[target_index - 1].get_left(),
                         endpoint_inset=endpoint_inset,

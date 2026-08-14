@@ -38,23 +38,12 @@ def _arc_length_parameterization(
     return cumulative_lengths / total_length, np.asarray(parameters)
 
 
-def handoff_mapsto_arrow(scene, displayed: MapstoArrow, canonical: MapstoArrow) -> None:
-    """Swap geometrically identical arrow groups without producing a frame of motion.
-
-    Call only after the displayed arrow's three parts have been transformed to
-    exactly match ``canonical``.  The next rendered frame has the same pixels,
-    but uses the canonical three-part group for later animations.
-    """
-    scene.remove(displayed)
-    scene.add(canonical)
-
-
 class TailToTipMapsto(Animation):
     """Draw a ``|→`` map arrow as one tail-to-tip gesture.
 
     The tail bar starts first, the shaft starts before that bar has finished,
     and the open caret grows from the shaft end only once the trace reaches it.
-    ``TupleMorphismDiagram._mapsto_arrow`` defines the expected group shape.
+    ``TupleMorphismDiagram.mapsto_arrow`` defines the expected group shape.
     """
 
     def __init__(self, mapsto_arrow: MapstoArrow, **kwargs) -> None:

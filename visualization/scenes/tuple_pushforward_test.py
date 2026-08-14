@@ -40,10 +40,11 @@ changes nothing but the tip, and a cell peeled off another stays invisible until
 it has moved clear, since coincident strokes would double up and darken.
 """
 
+from layout_categories_viz.scene_base import LayoutScene
+
 from dataclasses import dataclass
 from math import prod
 
-import numpy as np
 from manim import (
     Create,
     DOWN,
@@ -51,21 +52,22 @@ from manim import (
     FadeOut,
     LEFT,
     ORIGIN,
-    Scene,
     Succession,
     Text,
     ValueTracker,
     VGroup,
     smooth,
 )
-from tract import NestedTuple, Nest_morphism
+from tract import NestedTuple, NestMorphism
 
 from layout_categories_viz.animations import DrawMapstoTip, UndrawMapstoTip
-from layout_categories_viz.style import BACKGROUND, CODE_FONT, INK
+from layout_categories_viz.style import CODE_FONT, INK
 
 # The pullback scene owns the drawing primitives the two share, so the mirror
 # images cannot drift apart.
-from scenes.tuple_pullback_test import (
+from layout_categories_viz import stacks
+from layout_categories_viz.stacks import (
+    make_place,
     ARROW_INSET,
     CELL_H,
     LABEL_FONT_SIZE,
@@ -74,9 +76,8 @@ from scenes.tuple_pullback_test import (
     MID_X,
     RIGHT_X,
     SLOT_STEP,
-    TuplePullbackTest,
-    _groups,
-    _revealed,
+    leaf_groups,
+    revealed,
 )
 
 
@@ -142,24 +143,23 @@ EXAMPLES = (
 )
 
 
-class TuplePushforwardTest(Scene):
+class TuplePushforwardTest(LayoutScene):
     """Deform 'refinement then morphism' into 'morphism then refinement'."""
 
     def construct(self) -> None:
-        self.camera.background_color = BACKGROUND
         for index, example in enumerate(EXAMPLES):
             self._show_pushforward(example)
-            self._clear_scene(last=index == len(EXAMPLES) - 1)
+            self.clear_scene(last=index == len(EXAMPLES) - 1)
 
     def _show_pushforward(self, example: PushforwardExample) -> None:
         U = NestedTuple(example.domain)
         V = NestedTuple(example.resolved_codomain())
         Uprime = NestedTuple(example.refinement)
-        g = Nest_morphism(U, V, example.mapping)
+        g = NestMorphism(U, V, example.mapping)
         gprime = g.pushforward_along(Uprime)
         Vprime = gprime.codomain
-        u_groups = _groups(Uprime, U)
-        v_groups = _groups(Vprime, V)
+        u_groups = leaf_groups(Uprime, U)
+        v_groups = leaf_groups(Vprime, V)
 
         # Scale the figure so the taller of the two spread stacks fits.
         slots = max(Uprime.length(), Vprime.length())
@@ -169,12 +169,11 @@ class TuplePushforwardTest(Scene):
         step = SLOT_STEP * scale
         baseline = -((slots - 1) * step) / 2
 
-        def place(column, index):
-            return np.array((column, baseline + index * step, 0.0))
+        place = make_place(baseline, step)
 
         def cell(value, center):
             return (
-                TuplePullbackTest._cell(value, ORIGIN)
+                stacks.cell(value, ORIGIN)
                 .scale(scale)
                 .move_to(center)
             )
@@ -188,8 +187,8 @@ class TuplePushforwardTest(Scene):
                 .next_to(anchor, DOWN, buff=0.3)
             )
 
-        segment = TuplePullbackTest._tree_segment
-        attached = TuplePullbackTest._attached
+        segment = stacks.tree_segment
+        attached = stacks.attached
 
         # --- Open: [U'] --refinement--> [U] --g--> [V]. ----------------------
         up_cells = [
@@ -210,7 +209,7 @@ class TuplePushforwardTest(Scene):
             for leaf in leaves
         ]
         g_arrows = {
-            mode: TuplePullbackTest._segment_arrow(
+            mode: stacks.segment_arrow(
                 u_cells[mode], v_cells[target - 1]
             )
             for mode, target in enumerate(example.mapping)
@@ -267,7 +266,7 @@ class TuplePushforwardTest(Scene):
                     coarse = cell(U.entry(mode + 1), start_center)[1]
                     split[1].set_opacity(0)
                     split.add(coarse)
-                TuplePullbackTest._split(
+                stacks.split_cell(
                     split,
                     alpha,
                     start_center,
@@ -281,7 +280,7 @@ class TuplePushforwardTest(Scene):
                         split,
                         v_cells[target - 1],
                         reveal=(
-                            (lambda: _revealed(alpha.get_value()))
+                            (lambda: revealed(alpha.get_value()))
                             if index
                             else None
                         ),
@@ -292,7 +291,7 @@ class TuplePushforwardTest(Scene):
         self.add(
             *arrows.values(),
             *fans.values(),
-            *TuplePullbackTest._deck(cells),
+            *stacks.deck(cells),
         )
 
         label_uprime = label("U'", cell(Uprime.flatten()[0], place(MID_X, 0)))
@@ -310,7 +309,7 @@ class TuplePushforwardTest(Scene):
         # of U', and they keep those tips through the reordering, where they
         # follow the cells they land on.
         tips = {
-            leaf: TuplePullbackTest._arrow_tip(
+            leaf: stacks.arrow_tip(
                 cells[leaf].get_left() + LEFT * ARROW_INSET
             )
             for leaf in cells
@@ -322,7 +321,7 @@ class TuplePushforwardTest(Scene):
         for leaf, tip in tips.items():
             tip.add_updater(
                 lambda mobject, leaf=leaf: mobject.become(
-                    TuplePullbackTest._arrow_tip(
+                    stacks.arrow_tip(
                         cells[leaf].get_left() + LEFT * ARROW_INSET
                     )
                 )
@@ -341,7 +340,7 @@ class TuplePushforwardTest(Scene):
         # the same direction -- as in the pullback, and as while splitting.
         self.add(*(cells[leaf] for leaf in retiring))
         self.add(
-            *TuplePullbackTest._deck(
+            *stacks.deck(
                 {
                     destination[leaf]: cells[leaf]
                     for leaf in cells
@@ -394,8 +393,3 @@ class TuplePushforwardTest(Scene):
             mobject.clear_updaters()
         self.wait(1.8)
 
-    def _clear_scene(self, *, last) -> None:
-        self.play(*(FadeOut(m) for m in self.mobjects), run_time=0.6)
-        self.clear()
-        if not last:
-            self.wait(0.2)

@@ -2,7 +2,7 @@
 
 import numpy as np
 from manim import DOWN, LEFT, RIGHT, Text, VGroup
-from tract import Nest_morphism
+from tract import NestMorphism
 
 from .nested_tuple import NestedTupleTree
 from .style import CODE_FONT, INK
@@ -30,7 +30,7 @@ class NestMorphismDiagram(VGroup):
         arrow_bend_handle=0.8,
     ) -> None:
         super().__init__()
-        morphism = Nest_morphism(domain, codomain, tuple(mapping))
+        morphism = NestMorphism(domain, codomain, tuple(mapping))
         self.domain = morphism.domain.data
         self.codomain = morphism.codomain.data
         self.mapping = tuple(mapping)
@@ -64,7 +64,7 @@ class NestMorphismDiagram(VGroup):
         for source_index, target_index in enumerate(self.mapping):
             if target_index == 0:
                 continue
-            arrow = TupleMorphismDiagram._mapsto_arrow(
+            arrow = TupleMorphismDiagram.mapsto_arrow(
                 self.source_tree.leaf_entries[source_index].get_right(),
                 self.target_tree.leaf_entries[target_index - 1].get_left(),
                 endpoint_inset=arrow_endpoint_inset,
