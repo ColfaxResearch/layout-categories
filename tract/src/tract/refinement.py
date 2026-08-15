@@ -6,6 +6,9 @@ Pure categorical operations: no layout backend is involved.
 
 from .nested_tuple import NestedTuple
 from .nest_morphism import NestMorphism
+from .ref_morphism import RefMorphism
+from .tuple_morphism import TupleMorphism
+from .spans import RefSpanMorphism, RefCoSpanMorphism
 
 
 def mutual_refinement(nestedtuple1: NestedTuple, nestedtuple2: NestedTuple):
@@ -79,18 +82,39 @@ def weak_composite(f: NestMorphism, g: NestMorphism) -> NestMorphism:
     """
     Compute the weak composition of nested tuple morphisms: composition
     through the mutual refinement of f's codomain with g's domain.
+
+    A Nest morphism f: S → T is a Tuple morphism flat(f) with a Ref
+    morphism (the nesting) at each end, so f and g present the RefSpan and
+    RefCoSpan morphisms
+
+        span(f)   = ρ(S) ←nest(S)— flat(S) —flat(f)→ flat(T)
+        cospan(g) = flat(U) —flat(g)→ flat(V) ←nest(V)— ρ(V)
+
+    and the mutual refinement (T′, U′) is the bridge
+
+        flat(T) ←b— flat(T′) —ι→ flat(U′) —c→ flat(U)
+
+    with b, c the Ref morphisms of relative modes and ι the prefix
+    inclusion in Tuple. Composing span(f) with the RefSpan morphism (b, ι)
+    pulls f back through the refinement and applies the inclusion;
+    composing the RefCoSpan morphism (·, c) with cospan(g) pushes g
+    forward. The backward legs accumulate the refined nestings S′ and V′
+    by grafting, and the weak composite S′ → V′ is read off the outer
+    legs.
     """
-    T = f.codomain
-    U = g.domain
+    Tprime, Uprime = mutual_refinement(f.codomain, g.domain)
+    b = RefMorphism(Tprime.relative_flattening(f.codomain))
+    c = RefMorphism(Uprime.relative_flattening(g.domain))
+    iota = TupleMorphism(
+        Tprime.flatten(), Uprime.flatten(), tuple(range(1, Tprime.length() + 1))
+    )
 
-    Tprime, Uprime = mutual_refinement(T, U)
-    assert Tprime.refines(T) and Uprime.refines(U)
+    span = RefSpanMorphism(RefMorphism(f.domain), f.flatten())
+    span = span.compose(RefSpanMorphism(b, iota))
+    cospan = RefCoSpanMorphism(span.right, c)
+    cospan = cospan.compose(RefCoSpanMorphism(g.flatten(), RefMorphism(g.codomain)))
 
-    inclusion = NestMorphism(Tprime, Uprime, tuple(range(1, Tprime.length() + 1)))
-    fprime = f.pullback_along(Tprime)
-    gprime = g.pushforward_along(Uprime)
-
-    return fprime.compose(inclusion).compose(gprime)
+    return NestMorphism(span.left.nest, cospan.right.nest, cospan.left.map)
 
 
 def mutual_refinement_to_tikz(

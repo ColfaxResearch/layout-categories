@@ -1,6 +1,16 @@
 """Reusable Manim components for layout-categories explanations."""
 
-from .style import BACKGROUND, CODE_FONT, INK, MODE_COLORS, MUTED, PANEL
+from .style import (
+    BACKGROUND,
+    CODE_FONT,
+    INK,
+    MODE_COLORS,
+    MUTED,
+    PANEL,
+    SHAPE_FILL,
+    STRIDE_FILL,
+)
+from .layouts import LayoutDiagram, layout_diagram
 from .animations import (
     DrawMapstoTip,
     TailToTipMapsto,
@@ -76,6 +86,10 @@ __all__ = [
     "MODE_COLORS",
     "MUTED",
     "PANEL",
+    "SHAPE_FILL",
+    "STRIDE_FILL",
+    "LayoutDiagram",
+    "layout_diagram",
     "LayoutScene",
     "MapstoArrow",
     "NestedTupleTree",

@@ -108,6 +108,23 @@ animations followed by the most substantial animation gaps.
   ([`RefSpanMorphismCompositionTest`](visualization/scenes/ref_span_composition_test.py),
   [`RefSpanMorphism.compose`](tract/src/tract/ref_span.py))
 
+- [x] Compose two tractable layouts in span language: each layout opens as
+  its nested depiction and is encoded as the span data it is — A as the
+  RefSpan morphism whose backward leg is its shape's nesting and whose
+  forward leg its strides present, B as just its flat Tuple morphism, its
+  nesting discarded as scaffolding. The mutual refinement grows as the
+  bridge between the two factorizations, one RefSpan composition performs
+  the pullback of A (the fans grafting onto A's tree are the backward legs
+  composing in Ref) and one RefCoSpan composition the pushforward of B, and
+  the layout-extraction collapse reads the composite layout off the
+  resulting span. Dead routes keep their cells: an S′ mode whose route dies
+  picks up stride 0, and an unreached V′ mode still counts toward the
+  prefix products. Two examples: fully generic, and every special case at
+  once (basepoints on both sides, unhit codomain modes, a retiring block).
+  ([`LayoutCompositionSpanTest`](visualization/scenes/layout_composition_span_test.py),
+  [`RefSpanMorphism.compose`](tract/src/tract/spans.py),
+  [`RefCoSpanMorphism.compose`](tract/src/tract/spans.py))
+
 ## To do
 
 ### Highest priority

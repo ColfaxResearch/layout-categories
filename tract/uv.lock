@@ -282,23 +282,23 @@ wheels = [
 name = "tract"
 version = "0.1.0"
 source = { editable = "." }
-dependencies = [
-    { name = "numpy" },
-    { name = "nvidia-cutlass-dsl" },
-]
 
 [package.optional-dependencies]
+cute = [
+    { name = "nvidia-cutlass-dsl" },
+]
 dev = [
+    { name = "numpy" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "numpy", specifier = ">=1.23.0" },
-    { name = "nvidia-cutlass-dsl", specifier = ">=4.2.0" },
+    { name = "numpy", marker = "extra == 'dev'", specifier = ">=1.23.0" },
+    { name = "nvidia-cutlass-dsl", marker = "extra == 'cute'", specifier = ">=4.2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["cute", "dev"]
 
 [[package]]
 name = "typing-extensions"

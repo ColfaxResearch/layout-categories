@@ -37,6 +37,9 @@ uv run manim scenes/ref_morphism_composition_test.py RefMorphismCompositionTest 
 
 # Compose spans in Span(Tuple, Ref)
 uv run manim scenes/ref_span_composition_test.py RefSpanMorphismCompositionTest -pql
+
+# Compose two tractable layouts in span language and read the layout off
+uv run manim scenes/layout_composition_span_test.py LayoutCompositionSpanTest -pql
 ```
 
 `ANIMATION_AUDIT.md` (repo root) lists every finished animation and the gaps.

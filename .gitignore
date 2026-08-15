@@ -2,3 +2,4 @@ __pycache__/
 *.egg-info/
 media/
 .ipynb_checkpoints/
+papers/

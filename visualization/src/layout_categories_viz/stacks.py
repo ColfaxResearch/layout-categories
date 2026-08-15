@@ -81,14 +81,14 @@ def make_place(baseline: float, step: float):
     return place
 
 
-def cell(value, center):
+def cell(value, center, *, fill=PANEL):
     box = RoundedRectangle(
         corner_radius=0.08,
         width=CELL_H,
         height=CELL_H,
         stroke_color=INK,
         stroke_width=1.8,
-        fill_color=PANEL,
+        fill_color=fill,
         fill_opacity=1,
     )
     label = Text(str(value), color=INK, font=CODE_FONT, font_size=FONT_SIZE)
